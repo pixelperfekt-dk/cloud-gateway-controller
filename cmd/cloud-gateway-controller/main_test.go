@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-const gateway_manifest string = `apiVersion: gateway.networking.k8s.io/v1beta1
-kind: Gateway
-metadata:
-  name: foo-gateway
-  namespace: gateway-api-example-ns1
-spec:
-  gatewayClassName: foo-lb`
+// const gateway_manifest string = `apiVersion: gateway.networking.k8s.io/v1beta1
+// kind: Gateway
+// metadata:
+//   name: foo-gateway
+//   namespace: gateway-api-example-ns1
+// spec:
+//   gatewayClassName: foo-lb`
 
 // func TestSync(t *testing.T) {
 // 	gw, err := sync([]byte(gateway_manifest))

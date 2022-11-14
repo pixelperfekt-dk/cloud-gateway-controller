@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 
@@ -58,6 +58,7 @@ func sync(request *SyncRequest) (*SyncResponse, error) {
 
 func isOurGatewayClass(gw *gateway.Gateway) bool {
 	if gw.Spec.GatewayClassName == "foo" {
+		log.Printf("Gateway Class: %q\n", gw.Spec.GatewayClassName)
 		return true
 	}
 	return false
@@ -72,7 +73,7 @@ func isOurGatewayClass(gw *gateway.Gateway) bool {
 // }
 
 func syncHandler(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -93,7 +94,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
 func main() {
