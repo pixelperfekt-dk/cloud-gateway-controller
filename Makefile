@@ -24,7 +24,7 @@ else
 endif
 
 # The binaries to build (just the basenames)
-BINS ?= cloud-controller
+BINS ?= cloud-gateway-controller
 
 # The platforms we support.  In theory this can be used for Windows platforms,
 # too, but they require specific base images, which we do not have.
