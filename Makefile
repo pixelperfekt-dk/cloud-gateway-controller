@@ -36,7 +36,7 @@ ALL_PLATFORMS ?= linux/amd64
 BASE_IMAGE ?= gcr.io/distroless/static
 
 # Where to push the docker images.
-REGISTRY ?= ghcr.io/michaelvl
+REGISTRY ?= ghcr.io/pixelperfekt-dk
 
 # This version-strategy uses git tags to set the version string
 VERSION ?= $(shell git describe --tags --always --dirty)
