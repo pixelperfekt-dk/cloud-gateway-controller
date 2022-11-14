@@ -14,12 +14,12 @@ metadata:
 spec:
   gatewayClassName: foo-lb`
 
-func TestSync(t *testing.T) {
-	gw, err := sync([]byte(gateway_manifest))
-	if err != nil || gw.ObjectMeta.Name != "foo-gateway" {
-		t.Errorf("Error testing API: err %q gw %+v", err, gw.ObjectMeta.Name)
-	}
-}
+// func TestSync(t *testing.T) {
+// 	gw, err := sync([]byte(gateway_manifest))
+// 	if err != nil || gw.ObjectMeta.Name != "foo-gateway" {
+// 		t.Errorf("Error testing API: err %q gw %+v", err, gw.ObjectMeta.Name)
+// 	}
+// }
 
 func TestGatewayClass(t *testing.T) {
 	gw := gateway.Gateway{
