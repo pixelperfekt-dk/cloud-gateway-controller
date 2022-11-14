@@ -1,0 +1,4 @@
+.PHONY: test-post
+test-post:
+	cat test-data/gateway.yaml | docker run --rm -i mikefarah/yq:4.24.5 -ojson '.' - | jq '{"parent": . }' > tmp.json
+	curl -XPOST -H "Content-Type: application/json" -d @tmp.json localhost:8080/sync
