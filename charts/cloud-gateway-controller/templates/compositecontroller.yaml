@@ -18,6 +18,3 @@ spec:
     sync:
       webhook:
         url: http://{{ include "cloud-gateway-controller.fullname" . }}.{{ .Release.Namespace }}.svc/sync
-    finalize:
-      webhook:
-        url: http://{{ include "cloud-gateway-controller.fullname" . }}.{{ .Release.Namespace }}.svc/finalize
