@@ -2,3 +2,55 @@
 test-post:
 	cat test-data/gateway.yaml | docker run --rm -i mikefarah/yq:4.24.5 -ojson '.' - | jq '{"parent": . }' > tmp.json
 	curl -XPOST -H "Content-Type: application/json" -d @tmp.json localhost:8080/sync
+
+#################
+
+ifeq ($(GATEWAY_API_VERSION),)
+GATEWAY_API_VERSION=v0.5.1
+endif
+
+.PHONY: gateway-api-upstream-get
+gateway-api-upstream-get:
+	mkdir upstream-gateway-api-crds
+	#kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd?ref=$(GATEWAY_API_VERSION)" > upstream-gateway-api-crds/crds.yaml
+	kubectl kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=$(GATEWAY_API_VERSION)" > upstream-gateway-api-crds/crds.yaml
+
+.PHONY: deploy-gateway-api
+deploy-gateway-api:
+	kubectl apply -f upstream-gateway-api-crds
+
+#################
+.PHONY: create-cluster
+create-cluster:
+	kind create cluster
+
+.PHONY: delete-cluster
+delete-cluster:
+	kind delete cluster
+
+.PHONY: kind-load-image
+kind-load-image:
+	kind load docker-image ghcr.io/pixelperfekt-dk/cloud-gateway-controller:$(VERSION)__linux_amd64
+
+.PHONY: kind-list-images
+kind-list-images:
+	docker exec -it kind-control-plane crictl images
+
+#################
+.PHONY: deploy-metacontroller
+deploy-metacontroller:
+	helm install metacontroller oci://ghcr.io/metacontroller/metacontroller-helm --version v4.7.0
+
+#################
+.PHONY: deploy-istio
+deploy-istio:
+	helm repo add istio https://istio-release.storage.googleapis.com/charts
+	helm repo update
+	kubectl create namespace istio-system
+	helm install istio-base istio/base -n istio-system
+	helm install istiod istio/istiod -n istio-system
+
+#################
+.PHONY: deploy-controller
+deploy-controller:
+	helm upgrade -i cloud-gateway-controller charts/cloud-gateway-controller --set image.tag=$(VERSION)__linux_amd64 --set image.repository=ghcr.io/pixelperfekt-dk/cloud-gateway-controller

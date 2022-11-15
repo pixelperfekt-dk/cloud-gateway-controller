@@ -29,8 +29,8 @@ type ControllerStatus struct {
 }
 
 type SyncRequest struct {
-	Parent    gateway.Gateway     `json:"parent"`
-	Children  SyncRequestChildren `json:"children"`
+	Parent   gateway.Gateway     `json:"parent"`
+	Children SyncRequestChildren `json:"children"`
 }
 
 type SyncRequestChildren struct {
@@ -48,11 +48,14 @@ func sync(request *SyncRequest) (*SyncResponse, error) {
 
 	gw_in := request.Parent
 	log.Printf("Got %+v", gw_in)
-	gw_out := &gw_in
-	gw_out.Spec.GatewayClassName = "foo-bar"
-	//gw_out := &gateway.Gateway{}
-	response.Children = append(response.Children, gw_out)
-
+	if gw_in.Spec.GatewayClassName == "foo-lb" {
+		gw_out := gw_in.DeepCopy()
+		gw_out.ResourceVersion = ""
+		//gw_out := &gateway.Gateway{}
+		gw_out.ObjectMeta.Name = gw_out.ObjectMeta.Name + "-istio"
+		gw_out.Spec.GatewayClassName = "istio"
+		response.Children = append(response.Children, gw_out)
+	}
 	return response, nil
 }
 
@@ -100,6 +103,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	log.Printf("version: %s\n", version.Version)
 	http.HandleFunc("/sync", syncHandler)
+	http.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
