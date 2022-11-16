@@ -1,3 +1,8 @@
+gatewayApi:
+  apiVersions:
+    gateway: v1beta1
+    gatewayClass: v1beta1
+
 metacontroller:
   apiVersion: v1alpha1
 

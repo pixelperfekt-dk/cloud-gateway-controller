@@ -7,10 +7,10 @@ metadata:
 spec:
   generateSelector: true
   parentResource:
-    apiVersion: gateway.networking.k8s.io/v1beta1
+    apiVersion: gateway.networking.k8s.io/{{ .Values.gatewayApi.apiVersions.gateway }}
     resource: gateways
   childResources:
-  - apiVersion: gateway.networking.k8s.io/v1beta1
+  - apiVersion: gateway.networking.k8s.io/{{ .Values.gatewayApi.apiVersions.gateway }}
     resource: gateways
     updateStrategy:
       method: InPlace
@@ -18,3 +18,6 @@ spec:
     sync:
       webhook:
         url: http://{{ include "cloud-gateway-controller.fullname" . }}.{{ .Release.Namespace }}.svc/sync
+    customize:
+      webhook:
+        url: http://{{ include "cloud-gateway-controller.fullname" . }}.{{ .Release.Namespace }}.svc/customize

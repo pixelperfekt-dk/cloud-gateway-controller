@@ -3,6 +3,10 @@ test-post:
 	cat test-data/gateway.yaml | docker run --rm -i mikefarah/yq:4.24.5 -ojson '.' - | jq '{"parent": . }' > tmp.json
 	curl -XPOST -H "Content-Type: application/json" -d @tmp.json localhost:8080/sync
 
+.PHONY: test-customize
+test-customize:
+	curl -XPOST -H "Content-Type: application/json" -d '{}' localhost:8080/customize
+
 #################
 
 ifeq ($(GATEWAY_API_VERSION),)
@@ -54,3 +58,7 @@ deploy-istio:
 .PHONY: deploy-controller
 deploy-controller:
 	helm upgrade -i cloud-gateway-controller charts/cloud-gateway-controller --set image.tag=$(VERSION)__linux_amd64 --set image.repository=ghcr.io/pixelperfekt-dk/cloud-gateway-controller
+
+.PHONY: undeploy-controller
+undeploy-controller:
+	helm uninstall cloud-gateway-controller

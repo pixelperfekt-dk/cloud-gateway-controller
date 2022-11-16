@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: default
+spec:
+  controllerName: "github.com/pixelperfekt-dk/cloud-gateway-controller"
+  parametersRef:
+    group: v1
+    kind: ConfigMap
+    name: default-gateway-class
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-gateway-class
+data:
+  tier2GatewayClass: istio

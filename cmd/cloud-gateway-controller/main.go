@@ -6,12 +6,14 @@ import (
 	"net/http"
 
 	"github.com/michaelvl/cloud-gateway-controller/pkg/version"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 	//kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 )
+
+const gatewayClassVersion string = "v1beta1"
 
 // type Controller struct {
 // 	metav1.TypeMeta   `json:",inline"`
@@ -31,10 +33,15 @@ type ControllerStatus struct {
 type SyncRequest struct {
 	Parent   gateway.Gateway     `json:"parent"`
 	Children SyncRequestChildren `json:"children"`
+	Related  SyncRequestRelated  `json:"related"`
 }
 
 type SyncRequestChildren struct {
 	Gateways map[string]*gateway.Gateway `json:"Gateway.v1beta1"`
+}
+
+type SyncRequestRelated struct {
+	GatewayClasses map[string]*gateway.GatewayClass `json:"GatewayClass.v1beta1"`
 }
 
 type SyncResponse struct {
@@ -42,12 +49,27 @@ type SyncResponse struct {
 	Children []runtime.Object `json:"children"`
 }
 
+type CustomizeRequest struct {
+	Parent gateway.Gateway `json:"parent"`
+}
+
+type CustomizeResourceRule struct {
+	ApiVersion    string   `json:"apiVersion"`
+	Resource      string   `json:"resource"`
+	LabelSelector metav1.LabelSelector `json:"labelSelector,omitempty"`
+	Namespace     string   `json:"namespace,omitempty"`
+	Names         []string `json:"names,omitempty"`
+}
+
+type CustomizeResponse struct {
+	Related []CustomizeResourceRule `json:"relatedResources"`
+}
+
 func sync(request *SyncRequest) (*SyncResponse, error) {
 	response := &SyncResponse{}
 	log.Printf("Got request %+v", request)
 
 	gw_in := request.Parent
-	log.Printf("Got %+v", gw_in)
 	if gw_in.Spec.GatewayClassName == "foo-lb" {
 		gw_out := gw_in.DeepCopy()
 		gw_out.ResourceVersion = ""
@@ -56,6 +78,21 @@ func sync(request *SyncRequest) (*SyncResponse, error) {
 		gw_out.Spec.GatewayClassName = "istio"
 		response.Children = append(response.Children, gw_out)
 	}
+	return response, nil
+}
+
+func customize(request *CustomizeRequest) (*CustomizeResponse, error) {
+	response := &CustomizeResponse{}
+	log.Printf("Got request %+v", request)
+
+	gw_class := CustomizeResourceRule{
+		ApiVersion:    "gateway.networking.k8s.io/"+gatewayClassVersion,
+		Resource:      "gatewayclasses",
+		//LabelSelector: "",
+		//Namespace:     "",
+		//Names:         []string,
+	}
+	response.Related = append(response.Related, gw_class)
 	return response, nil
 }
 
@@ -100,9 +137,35 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+func customizeHandler(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	request := &CustomizeRequest{}
+	if err := json.Unmarshal(body, request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	response, err := customize(request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	body, err = json.Marshal(&response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(body)
+}
+
 func main() {
 	log.Printf("version: %s\n", version.Version)
 	http.HandleFunc("/sync", syncHandler)
+	http.HandleFunc("/customize", customizeHandler)
 	http.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
