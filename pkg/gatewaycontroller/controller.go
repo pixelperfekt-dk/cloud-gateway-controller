@@ -40,6 +40,19 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("reconsile", "gatewayclasses", classes)
 
+	if gw.Spec.GatewayClassName == "default" {
+		log.Info("handled by us", "gatewayclass", gw.Spec.GatewayClassName)
+		gw_out := gw.DeepCopy()
+		gw_out.ResourceVersion = ""
+		gw_out.ObjectMeta.Name = gw_out.ObjectMeta.Name + "-istio"
+		gw_out.Spec.GatewayClassName = "istio"
+		// FIXME test not already existing
+		if err := r.Create(ctx, gw_out); err != nil {
+			log.Error(err, "unable to create Gateway", "gateway", gw)
+			return ctrl.Result{}, err
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
