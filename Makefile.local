@@ -1,3 +1,10 @@
+-include Makefile.kubebuilder
+
+#################
+.PHONY: all-setup
+all-setup: create-cluster deploy-gateway-api kind-load-image deploy-istio deploy-controller
+
+#################
 .PHONY: test-post
 test-post:
 	cat test-data/gateway.yaml | docker run --rm -i mikefarah/yq:4.24.5 -ojson '.' - | jq '{"parent": . }' > tmp.json
@@ -39,11 +46,6 @@ kind-load-image:
 .PHONY: kind-list-images
 kind-list-images:
 	docker exec -it kind-control-plane crictl images
-
-#################
-.PHONY: deploy-metacontroller
-deploy-metacontroller:
-	helm install metacontroller oci://ghcr.io/metacontroller/metacontroller-helm --version v4.7.0
 
 #################
 .PHONY: deploy-istio
