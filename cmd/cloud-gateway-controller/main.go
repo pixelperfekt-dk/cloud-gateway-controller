@@ -1,109 +1,100 @@
 package main
 
 import (
-	"io"
-	"log"
-	"net/http"
+	"flag"
+	"os"
 
-	"github.com/michaelvl/cloud-gateway-controller/pkg/version"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/json"
-	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-	//kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/pixelperfekt-dk/cloud-gateway-controller/pkg/gatewaycontroller"
+	"github.com/pixelperfekt-dk/cloud-gateway-controller/pkg/version"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	//+kubebuilder:scaffold:imports
 )
 
-// type Controller struct {
-// 	metav1.TypeMeta   `json:",inline"`
-// 	metav1.ObjectMeta `json:"metadata"`
-// 	Spec              ControllerSpec   `json:"spec"`
-// 	Status            ControllerStatus `json:"status"`
-// }
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
 
-// type ControllerSpec struct {
-// 	Message string `json:"message"`
-// }
-
-type ControllerStatus struct {
-	Succeeded int `json:"succeeded"`
-}
-
-type SyncRequest struct {
-	Parent   gateway.Gateway     `json:"parent"`
-	Children SyncRequestChildren `json:"children"`
-}
-
-type SyncRequestChildren struct {
-	Gateways map[string]*gateway.Gateway `json:"Gateway.v1beta1"`
-}
-
-type SyncResponse struct {
-	Status   ControllerStatus `json:"status"`
-	Children []runtime.Object `json:"children"`
-}
-
-func sync(request *SyncRequest) (*SyncResponse, error) {
-	response := &SyncResponse{}
-	log.Printf("Got request %+v", request)
-
-	gw_in := request.Parent
-	log.Printf("Got %+v", gw_in)
-	if gw_in.Spec.GatewayClassName == "foo-lb" {
-		gw_out := gw_in.DeepCopy()
-		gw_out.ResourceVersion = ""
-		//gw_out := &gateway.Gateway{}
-		gw_out.ObjectMeta.Name = gw_out.ObjectMeta.Name + "-istio"
-		gw_out.Spec.GatewayClassName = "istio"
-		response.Children = append(response.Children, gw_out)
-	}
-	return response, nil
-}
-
-func isOurGatewayClass(gw *gateway.Gateway) bool {
-	if gw.Spec.GatewayClassName == "foo" {
-		log.Printf("Gateway Class: %q\n", gw.Spec.GatewayClassName)
-		return true
-	}
-	return false
-}
-
-// func sync(body []byte) (*gateway.Gateway, error) {
-// 	gw := gateway.Gateway{}
-// 	if err := kyaml.Unmarshal(body, gw); err != nil {
-// 		return nil, err
-// 	}
-// 	return &gw, nil
-// }
-
-func syncHandler(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	request := &SyncRequest{}
-	if err := json.Unmarshal(body, request); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	response, err := sync(request)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	body, err = json.Marshal(&response)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(body)
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1beta1.AddToScheme(scheme))
+	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	log.Printf("version: %s\n", version.Version)
-	http.HandleFunc("/sync", syncHandler)
-	http.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {})
+	var metricsAddr string
+	var enableLeaderElection bool
+	var probeAddr string
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+	opts := zap.Options{
+		Development: true,
+	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	setupLog.Info("initializing", "version", version.Version)
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "77c39b72.pixelperfekt.dk",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if err = (&gatewaycontroller.GatewayReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GatewayController")
+		os.Exit(1)
+	}
+	//+kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
 }

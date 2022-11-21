@@ -9,3 +9,10 @@ the Gateway API and creates `Gateway` and other resources in response. Hence,
 this controller is a controller of controllers. This concept is described in
 [Future of Cloud LB
 Integration](https://events.istio.io/istiocon-2022/slides/f3-K8sGatewayAPIs.pdf).
+
+## Deploying
+
+```
+kubectl apply -f test-data/gateway-class.yaml
+kubectl apply -f test-data/gateway.yaml
+```
