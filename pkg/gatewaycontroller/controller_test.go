@@ -1,9 +1,10 @@
 package gatewaycontroller
 
 import (
+	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"testing"
-	"gopkg.in/yaml.v3"
 )
 
 const gateway_manifest string = `
@@ -31,25 +32,27 @@ spec:
     kind: ConfigMap
     name: default-gateway-class`
 
-// func TestSync(t *testing.T) {
-// 	gw, err := sync([]byte(gateway_manifest))
-// 	if err != nil || gw.ObjectMeta.Name != "foo-gateway" {
-// 		t.Errorf("Error testing API: err %q gw %+v", err, gw.ObjectMeta.Name)
-// 	}
-// }
+const configmap_manifest string = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-gateway-class
+  namespace: default
+data:
+  tier2GatewayClass: istio`
 
 func TestGatewayClass(t *testing.T) {
 	r := GatewayReconciler{}
 	gw := &gateway.Gateway{}
-	gwc := &gateway.GatewayClass{}
+	cm := &corev1.ConfigMap{}
 	_ = yaml.Unmarshal([]byte(gateway_manifest), gw)
-	_ = yaml.Unmarshal([]byte(gatewayclass_manifest), gwc)
-	gw_out,err := r.constructGateway(gw, gwc)
-	if err!=nil {
-		t.Errorf("Error converting gateway: %+v, %q", gw, err)
+	_ = yaml.Unmarshal([]byte(configmap_manifest), cm)
+	gw_out, err := r.constructGateway(gw, cm)
+	if err != nil {
+		t.Fatalf("Error converting gateway: %+v, %q", gw, err)
 	}
-	if gw_out==nil {
-		t.Errorf("Error converting gateway: %+v, %q", gw, err)
+	if gw_out == nil {
+		t.Fatalf("Error converting gateway: %+v, %q", gw, err)
 	}
 	if gw_out.Spec.GatewayClassName != "istio" {
 		t.Errorf("Unexpected GatewayClassName: %+v", gw_out)

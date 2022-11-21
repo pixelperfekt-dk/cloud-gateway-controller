@@ -8,10 +8,12 @@ spec:
     group: v1
     kind: ConfigMap
     name: default-gateway-class
+    namespace: default
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: default-gateway-class
+  namespace: default
 data:
   tier2GatewayClass: istio

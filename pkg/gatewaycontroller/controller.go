@@ -3,6 +3,7 @@ package gatewaycontroller
 import (
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,6 +16,10 @@ import (
 	//lister "sigs.k8s.io/gateway-api/pkg/client/listers/apis/v1beta1"
 )
 
+const (
+	SelfControllerName gateway.GatewayController = "github.com/pixelperfekt-dk/cloud-gateway-controller"
+)
+
 type GatewayReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -24,12 +29,12 @@ type GatewayReconciler struct {
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/finalizers,verbs=update
 
-func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, class *gateway.GatewayClass) (*gateway.Gateway, error) {
+func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *corev1.ConfigMap) (*gateway.Gateway, error) {
 	name := fmt.Sprintf("%s-%s", gw_in.ObjectMeta.Name, "istio") // FIXME create suffix from gatewayclass configmap
 	gw_out := gw_in.DeepCopy()
 	gw_out.ResourceVersion = ""
 	gw_out.ObjectMeta.Name = name
-	gw_out.Spec.GatewayClassName = "istio" // FIXME get from gatewayclass configmap
+	gw_out.Spec.GatewayClassName = gateway.ObjectName(configmap.Data["tier2GatewayClass"])
 
 	return gw_out, nil
 }
@@ -42,19 +47,47 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	log.Info("reconsile", "gateway", gw)
+	log.Info("reconcile", "gateway", gw)
 
 	classes := &gateway.GatewayClassList{}
 	err = r.List(ctx, classes, client.InNamespace(metav1.NamespaceAll))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	log.Info("reconsile", "gatewayclasses", classes)
 
-	if gw.Spec.GatewayClassName == "default" {
-		log.Info("handled by us", "gatewayclass", gw.Spec.GatewayClassName)
+	// Look for a matching GatewayClass that are implemented by us
+	var gwclass *gateway.GatewayClass
+	for _, gwc := range classes.Items {
+		if gwc.Spec.ControllerName == SelfControllerName && gwc.ObjectMeta.Name == string(gw.Spec.GatewayClassName) {
+			log.Info("defined by", "gatewayclass", gwc)
+			gwclass = &gwc
+			break
+		}
+	}
+
+	if gwclass != nil {
+		log.Info("reconcile", "gatewayclasses", gwclass)
+		// Lookup associated ConfigMap
+		var configmap *corev1.ConfigMap
+		if gwclass.Spec.ParametersRef != nil {
+			configmaps := &corev1.ConfigMapList{}
+			// TODO: Check parametersref group+kind is configmap
+			err = r.List(ctx, configmaps, client.InNamespace(string(*gwclass.Spec.ParametersRef.Namespace)))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			for _, cm := range configmaps.Items {
+				if cm.ObjectMeta.Name == gwclass.Spec.ParametersRef.Name {
+					log.Info("defined by", "configmap", cm)
+					configmap = &cm
+					break
+				}
+			}
+		}
+		log.Info("configured by", "configmap", configmap.Data)
+
 		// FIXME test not already existing
-		gw_out, err := r.constructGateway(gw, &classes.Items[0]) // FIXME, find matching class
+		gw_out, err := r.constructGateway(gw, configmap)
 		if err != nil {
 			log.Error(err, "unable to build Gateway object", "gateway", gw)
 			return ctrl.Result{}, err
