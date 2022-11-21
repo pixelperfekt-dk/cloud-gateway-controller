@@ -24,16 +24,13 @@ type GatewayReconciler struct {
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/finalizers,verbs=update
 
-func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, class gateway.GatewayClass) (*gateway.Gateway, error) {
+func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, class *gateway.GatewayClass) (*gateway.Gateway, error) {
 	name := fmt.Sprintf("%s-%s", gw_in.ObjectMeta.Name, "istio") // FIXME create suffix from gatewayclass configmap
 	gw_out := gw_in.DeepCopy()
 	gw_out.ResourceVersion = ""
 	gw_out.ObjectMeta.Name = name
 	gw_out.Spec.GatewayClassName = "istio" // FIXME get from gatewayclass configmap
 
-	if err := ctrl.SetControllerReference(gw_in, gw_out, r.Scheme); err != nil {
-		return nil, err
-        }
 	return gw_out, nil
 }
 
@@ -57,9 +54,13 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gw.Spec.GatewayClassName == "default" {
 		log.Info("handled by us", "gatewayclass", gw.Spec.GatewayClassName)
 		// FIXME test not already existing
-		gw_out, err := r.constructGateway(gw, classes.Items[0]) // FIXME, find matching class
+		gw_out, err := r.constructGateway(gw, &classes.Items[0]) // FIXME, find matching class
 		if err != nil {
 			log.Error(err, "unable to build Gateway object", "gateway", gw)
+			return ctrl.Result{}, err
+		}
+		if err := ctrl.SetControllerReference(gw, gw_out, r.Scheme); err != nil {
+			log.Error(err, "unable to set controllerreference for Gateway", "gateway", gw_out)
 			return ctrl.Result{}, err
 		}
 		if err := r.Create(ctx, gw_out); err != nil {
