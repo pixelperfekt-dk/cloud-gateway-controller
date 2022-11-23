@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -98,17 +99,19 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		gw := &gateway.Gateway{}
-		err = r.Get(ctx, req.NamespacedName, gw)
+		gw_found := &gateway.Gateway{}
+		err = r.Get(ctx, types.NamespacedName{Name: gw_out.Name, Namespace: gw_out.Namespace}, gw_found)
 		if err != nil && errors.IsNotFound(err) {
+			log.Info("create gateway")
 			if err := r.Create(ctx, gw_out); err != nil {
-				log.Error(err, "unable to create Gateway", "gateway", gw)
+				log.Error(err, "unable to create Gateway", "gateway", gw_out)
 				return ctrl.Result{}, err
 			}
 		} else if err == nil {
-			// TODO: Compare, if not equal, update
+			// TODO: Compare gw_out and gw_found, if not equal, update
+			log.Info("update gateway", "gw", gw_found)
 			if err := r.Update(ctx, gw_out); err != nil {
-				log.Error(err, "unable to create Gateway", "gateway", gw)
+				log.Error(err, "unable to update Gateway", "gateway", gw_out)
 				return ctrl.Result{}, err
 			}
 		}
