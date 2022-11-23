@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,9 +97,20 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "unable to set controllerreference for Gateway", "gateway", gw_out)
 			return ctrl.Result{}, err
 		}
-		if err := r.Create(ctx, gw_out); err != nil {
-			log.Error(err, "unable to create Gateway", "gateway", gw)
-			return ctrl.Result{}, err
+
+		gw := &gateway.Gateway{}
+		err = r.Get(ctx, req.NamespacedName, gw)
+		if err != nil && errors.IsNotFound(err) {
+			if err := r.Create(ctx, gw_out); err != nil {
+				log.Error(err, "unable to create Gateway", "gateway", gw)
+				return ctrl.Result{}, err
+			}
+		} else if err == nil {
+			// TODO: Compare, if not equal, update
+			if err := r.Update(ctx, gw_out); err != nil {
+				log.Error(err, "unable to create Gateway", "gateway", gw)
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
