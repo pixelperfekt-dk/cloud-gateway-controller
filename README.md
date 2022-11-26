@@ -12,7 +12,7 @@ this controller is a controller of controllers. This concept is described in
 [Future of Cloud LB
 Integration](https://events.istio.io/istiocon-2022/slides/f3-K8sGatewayAPIs.pdf).
 
-The controller have several similarities with [GKE Gateway controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller)
+The controller have several similarities with [GKE Gateway controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller), except this controller aims at being cloud agnostic.
 
 ## Building
 
