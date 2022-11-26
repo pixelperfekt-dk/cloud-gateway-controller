@@ -35,10 +35,16 @@ Deploy controller:
 make kind-load-image deploy-controller
 ```
 
-Deploy gateway-class for the controller and an example `Gateway`:
+Deploy `GatewayClass` and a `ConfigMap` referenced by the `GatewayClass`. This
+configured the controller:
 
 ```
 kubectl apply -f test-data/gateway-class.yaml
+```
+
+Deploy an example `Gateway`:
+ 
+```
 kubectl apply -f test-data/gateway.yaml
 ```
 
