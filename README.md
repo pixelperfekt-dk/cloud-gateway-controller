@@ -10,9 +10,14 @@ resources it creates a 'shadow' `Gateway` resource with a different
 gateway-class and other resources to implement a network infrastructure. Hence,
 this controller is a controller of controllers. This concept is described in
 [Future of Cloud LB
-Integration](https://events.istio.io/istiocon-2022/slides/f3-K8sGatewayAPIs.pdf).
+Integration](https://events.istio.io/istiocon-2022/slides/f3-K8sGatewayAPIs.pdf). Particularly
+this slide:
 
-The controller have several similarities with [GKE Gateway controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller), except this controller aims at being cloud agnostic.
+![IstioCon slide][doc/images/istiocon-slide.png]
+
+The controller have several similarities with [GKE Gateway
+controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller),
+except this controller aims at being cloud agnostic.
 
 ## Building
 
@@ -50,4 +55,4 @@ kubectl apply -f test-data/gateway.yaml
 
 In response to the `foo-gateway` defined in `gateway.yaml`, expect to see a
 shadow `Gateway` called `foo-gateway-istio`. Also, expect to see Istio respond
-to the `foo-gateway-istio` `Gateway` by creading an ingress-gateway deployment.
+to the `foo-gateway-istio` `Gateway` by creating an ingress-gateway deployment.
