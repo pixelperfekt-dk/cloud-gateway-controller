@@ -72,9 +72,9 @@ make deploy-contour
 kubectl apply -f test-data/wip.yaml
 ```
 
-Test access to test application:
-
 *** End WIP section
+
+Test access to test application:
 
 ```
 curl -H 'Host: example.com' localhost/foo
