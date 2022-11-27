@@ -41,18 +41,43 @@ make kind-load-image deploy-controller
 ```
 
 Deploy `GatewayClass` and a `ConfigMap` referenced by the `GatewayClass`. This
-configured the controller:
+provides configuration for the controller:
 
 ```
 kubectl apply -f test-data/gateway-class.yaml
 ```
 
-Deploy an example `Gateway`:
+Deploy an example `Gateway` and `HTTPRoute`:
  
 ```
-kubectl apply -f test-data/gateway.yaml
+helm template foo gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/user-gateway-values.yaml | kubectl apply -f -
 ```
 
-In response to the `foo-gateway` defined in `gateway.yaml`, expect to see a
-shadow `Gateway` called `foo-gateway-istio`. Also, expect to see Istio respond
-to the `foo-gateway-istio` `Gateway` by creating an ingress-gateway deployment.
+In response to the `foo-gateway-api` `Gateway` created, expect to see a shadow
+`Gateway` called `foo-gateway-api-istio`. Also, expect to see Istio respond to
+the `foo-gateway-api-istio` `Gateway` by creating an ingress-gateway
+deployment. The PODs created for the Istio ingress-gateway names will start with
+`foo-gateway-api-istio-`.
+
+Deploy a test application that matches the deployed `HTTPRoute`:
+
+```
+kubectl apply -f test-data/nginx-test-app.yaml
+```
+
+*** The following is still work in progress
+
+```
+make deploy-contour
+kubectl apply -f test-data/wip.yaml
+```
+
+Test access to test application:
+
+*** End WIP section
+
+```
+curl -H 'Host: example.com' localhost/foo
+```
+
+Expect to see Nginx report `Not Found` to the `/foo` path.

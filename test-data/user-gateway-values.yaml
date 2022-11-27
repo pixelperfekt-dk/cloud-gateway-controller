@@ -1,0 +1,17 @@
+labels:
+  app: gw-internal
+  gw-type: internal
+
+gateway:
+  create: true
+  gatewayClassName: cloud-gw
+  listeners:
+    web:
+      port: 80
+      protocol: HTTP
+      hostname: "example.com"
+
+httproutes:
+  rt1:
+    uriprefix: "/foo"
+    destination: svc1
