@@ -13,7 +13,7 @@ this controller is a controller of controllers. This concept is described in
 Integration](https://events.istio.io/istiocon-2022/slides/f3-K8sGatewayAPIs.pdf). Particularly
 this slide:
 
-![IstioCon slide](doc/images/istiocon-slide.png)
+> ![IstioCon slide](doc/images/istiocon-slide.png)
 
 The controller have several similarities with [GKE Gateway
 controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller),
