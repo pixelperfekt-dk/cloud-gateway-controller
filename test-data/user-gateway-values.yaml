@@ -1,7 +1,3 @@
-labels:
-  app: gw-internal
-  gw-type: internal
-
 gateway:
   create: true
   gatewayClassName: cloud-gw
@@ -14,4 +10,4 @@ gateway:
 httproutes:
   rt1:
     uriprefix: "/foo"
-    destination: svc1
+    destination: http-echo

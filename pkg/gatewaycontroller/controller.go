@@ -44,6 +44,9 @@ func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *
 	gw_out := gw_in.DeepCopy()
 	gw_out.ResourceVersion = ""
 	gw_out.ObjectMeta.Name = name
+	if gw_out.ObjectMeta.Annotations==nil {
+		gw_out.ObjectMeta.Annotations = map[string]string{}
+	}
 	gw_out.ObjectMeta.Annotations["networking.istio.io/service-type"] = "ClusterIP"
 	gw_out.Spec.GatewayClassName = gateway.ObjectName(configmap.Data["tier2GatewayClass"])
 

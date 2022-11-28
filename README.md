@@ -62,7 +62,7 @@ deployment. The PODs created for the Istio ingress-gateway names will start with
 Deploy a test application that matches the deployed `HTTPRoute`:
 
 ```
-kubectl apply -f test-data/nginx-test-app.yaml
+kubectl apply -f test-data/test-app.yaml
 ```
 
 *** The following is still work in progress
@@ -79,4 +79,4 @@ Test access to test application:
 curl -H 'Host: example.com' localhost/foo
 ```
 
-Expect to see Nginx report `Not Found` to the `/foo` path.
+Expect to see a `foo-bar` being echo'ed.
