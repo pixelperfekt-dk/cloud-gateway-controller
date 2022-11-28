@@ -7,14 +7,31 @@ spec:
   parametersRef:
     group: v1
     kind: ConfigMap
-    name: default-gateway-class
+    name: cloud-gw-gateway-class
     namespace: default
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: default-gateway-class
+  name: cloud-gw-gateway-class
   namespace: default
 data:
   tier2GatewayClass: istio
-  tier2IngressClass: contour
+  albTemplate: |
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: {{ .Name }}
+      namespace: {{ .Namespace }}
+    spec:
+      ingressClassName: contour
+      rules:
+      - http:
+          paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Name }}
+                port:
+                  number: 80

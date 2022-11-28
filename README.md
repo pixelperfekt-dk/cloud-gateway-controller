@@ -31,7 +31,7 @@ make gateway-api-upstream-get
 Setup test environment (using Istio for the 'shadow' gateway-class):
 
 ```
-make create-cluster deploy-gateway-api deploy-istio 
+make create-cluster deploy-gateway-api deploy-istio deploy-contour
 ```
 
 Deploy controller:
@@ -68,7 +68,6 @@ kubectl apply -f test-data/nginx-test-app.yaml
 *** The following is still work in progress
 
 ```
-make deploy-contour
 kubectl apply -f test-data/wip.yaml
 ```
 

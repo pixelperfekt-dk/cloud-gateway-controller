@@ -14,3 +14,6 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+upstream-gateway-api-crds/*
+upstream-gateway-api-webhook/*
