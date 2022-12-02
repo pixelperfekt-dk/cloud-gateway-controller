@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/pixelperfekt-dk/cloud-gateway-controller/pkg/gatewaycontroller"
+	"github.com/pixelperfekt-dk/cloud-gateway-controller/pkg/controllers"
 	"github.com/pixelperfekt-dk/cloud-gateway-controller/pkg/version"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	//+kubebuilder:scaffold:imports
@@ -74,11 +74,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&gatewaycontroller.GatewayReconciler{
+	if err = (&controllers.GatewayReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayController")
+		os.Exit(1)
+	}
+	if err = (&controllers.HTTPRouteReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "HTTPRouteController")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -1,4 +1,4 @@
-package gatewaycontroller
+package controllers
 
 import (
 	"bytes"
@@ -8,17 +8,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -44,7 +45,7 @@ func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *
 	gw_out := gw_in.DeepCopy()
 	gw_out.ResourceVersion = ""
 	gw_out.ObjectMeta.Name = name
-	if gw_out.ObjectMeta.Annotations==nil {
+	if gw_out.ObjectMeta.Annotations == nil {
 		gw_out.ObjectMeta.Annotations = map[string]string{}
 	}
 	gw_out.ObjectMeta.Annotations["networking.istio.io/service-type"] = "ClusterIP"
@@ -53,24 +54,38 @@ func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *
 	return gw_out, nil
 }
 
-func (r *GatewayReconciler) constructAlbTemplate(gw_in, gw_out *gateway.Gateway, configmap *corev1.ConfigMap) ([]byte, error) {
+func (r *GatewayReconciler) constructAlbTemplate(gw_in, gw_out *gateway.Gateway, configmap *corev1.ConfigMap) (*unstructured.Unstructured, error) {
 	var b bytes.Buffer
+	var u *unstructured.Unstructured
 	tmpl, found := configmap.Data["albTemplate"]
 	if !found {
-		return b.Bytes(), nil
+		// TODO return error
+		return u, nil
 	}
 	ptmpl, err := template.New("alb").Parse(tmpl)
 	if err != nil {
 		// TODO log
-		return b.Bytes(), nil
+		return u, err
 	}
 	data := &albTemplateValues{gw_out}
 	err = ptmpl.Execute(io.Writer(&b), data)
 	if err != nil {
 		// TODO log
-		return b.Bytes(), nil
+		return u, err
 	}
-	return b.Bytes(), nil
+	json, err := yaml.ToJSON(b.Bytes())
+	if err != nil {
+		return u, err
+	}
+	object, err := runtime.Decode(unstructured.UnstructuredJSONScheme, json)
+	if err != nil {
+		return u, err
+	}
+	u, ok := object.(*unstructured.Unstructured)
+	if !ok {
+		return u, nil // TODO return error
+	}
+	return u, nil
 }
 
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -79,7 +94,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	gw := &gateway.Gateway{}
 	err := r.Get(ctx, req.NamespacedName, gw)
 	if err != nil {
-		return reconcile.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log.Info("reconcile", "gateway", gw)
 
@@ -151,11 +166,15 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		// Create ALB resource
-		alb, err := r.constructAlbTemplate(gw, gw_out, configmap)
-		log.Info("create alb", "alb", string(alb))
+		alb_u, err := r.constructAlbTemplate(gw, gw_out, configmap)
+		log.Info("create alb", "alb_u_kind", alb_u.GetKind())
 		ing := &netv1.Ingress{}
-		if err := yaml.Unmarshal(alb, ing); err != nil {
+
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(alb_u.Object, &ing)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
+
 		if err := ctrl.SetControllerReference(gw, ing, r.Scheme); err != nil {
 			log.Error(err, "unable to set controllerreference for Ingress", "ingress", ing)
 			return ctrl.Result{}, err

@@ -1,4 +1,4 @@
-package gatewaycontroller
+package controllers
 
 import (
 	"gopkg.in/yaml.v3"
