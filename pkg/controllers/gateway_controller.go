@@ -55,38 +55,41 @@ func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *
 }
 
 func (r *GatewayReconciler) constructAlbTemplate(gw_in, gw_out *gateway.Gateway, configmap *corev1.ConfigMap) (*unstructured.Unstructured, error) {
-	var b bytes.Buffer
-	var u *unstructured.Unstructured
+	var buf bytes.Buffer
 	tmpl, found := configmap.Data["albTemplate"]
 	if !found {
 		// TODO return error
-		return u, nil
+		return nil, nil
 	}
 	ptmpl, err := template.New("alb").Parse(tmpl)
 	if err != nil {
 		// TODO log
-		return u, err
+		return nil, err
 	}
-	data := &albTemplateValues{gw_out}
-	err = ptmpl.Execute(io.Writer(&b), data)
+	input := &albTemplateValues{gw_out}
+	err = ptmpl.Execute(io.Writer(&buf), input)
 	if err != nil {
 		// TODO log
-		return u, err
+		return nil, err
 	}
-	json, err := yaml.ToJSON(b.Bytes())
+	data := map[string]any{}
+	err = yaml.Unmarshal(buf.Bytes(), &data)
 	if err != nil {
-		return u, err
+		return nil, err
 	}
-	object, err := runtime.Decode(unstructured.UnstructuredJSONScheme, json)
-	if err != nil {
-		return u, err
-	}
-	u, ok := object.(*unstructured.Unstructured)
-	if !ok {
-		return u, nil // TODO return error
-	}
-	return u, nil
+	us := unstructured.Unstructured{Object: data}
+	return &us, nil
 }
+
+// 	gvr, err := controllers.UnstructuredToGVR(us)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	j, err := json.Marshal(us.Object)
+// 	if err != nil {
+// 		return err
+// 	}
+// }
 
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
@@ -117,20 +120,12 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if gwclass != nil {
 		log.Info("reconcile", "gatewayclasses", gwclass)
 		// Lookup associated ConfigMap
-		var configmap *corev1.ConfigMap
+		configmap := &corev1.ConfigMap{}
 		if gwclass.Spec.ParametersRef != nil {
-			configmaps := &corev1.ConfigMapList{}
 			// TODO: Check parametersref group+kind is configmap
-			err = r.List(ctx, configmaps, client.InNamespace(string(*gwclass.Spec.ParametersRef.Namespace)))
+			err := r.Get(ctx, types.NamespacedName{string(*gwclass.Spec.ParametersRef.Namespace), gwclass.Spec.ParametersRef.Name}, configmap)
 			if err != nil {
-				return reconcile.Result{}, err
-			}
-			for _, cm := range configmaps.Items {
-				if cm.ObjectMeta.Name == gwclass.Spec.ParametersRef.Name {
-					log.Info("defined by", "configmap", cm)
-					configmap = &cm
-					break
-				}
+				return ctrl.Result{}, client.IgnoreNotFound(err)
 			}
 		}
 		log.Info("configured by", "configmap", configmap.Data)
@@ -167,16 +162,17 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		// Create ALB resource
 		alb_u, err := r.constructAlbTemplate(gw, gw_out, configmap)
-		log.Info("create alb", "alb_u_kind", alb_u.GetKind())
-		ing := &netv1.Ingress{}
 
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(alb_u.Object, &ing)
-		if err != nil {
+		log.Info("create alb", "alb_u_kind", alb_u.GetKind())
+
+		if err := ctrl.SetControllerReference(gw, alb_u, r.Scheme); err != nil {
+			log.Error(err, "unable to set controllerreference for alb template", "alb_u", alb_u)
 			return ctrl.Result{}, err
 		}
 
-		if err := ctrl.SetControllerReference(gw, ing, r.Scheme); err != nil {
-			log.Error(err, "unable to set controllerreference for Ingress", "ingress", ing)
+		ing := &netv1.Ingress{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(alb_u.Object, &ing)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 

@@ -47,7 +47,9 @@ provides configuration for the controller:
 kubectl apply -f test-data/gateway-class.yaml
 ```
 
-Deploy an example `Gateway` and `HTTPRoute`:
+Deploy an example `Gateway` and `HTTPRoute` with the following command. You can
+review the `Gateway` and `HTTPRoute` resources by leaving out the `kubectl apply
+-f -` part:
  
 ```
 helm template foo gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/user-gateway-values.yaml | kubectl apply -f -

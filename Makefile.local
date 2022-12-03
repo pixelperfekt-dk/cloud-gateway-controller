@@ -1,8 +1,9 @@
--include Makefile.kubebuilder
+.PHONY: default
+default: build
 
 #################
 .PHONY: all-setup
-all-setup: create-cluster deploy-gateway-api kind-load-image deploy-istio deploy-controller deploy-contour
+all-setup: build container create-cluster deploy-gateway-api kind-load-image deploy-istio deploy-controller deploy-contour deploy-controller-gatewayclass deploy-test-app
 
 #################
 
@@ -77,3 +78,13 @@ controller-redeploy: undeploy-controller deploy-controller
 .PHONY: controller-rebuild-redeploy
 controller-rebuild-redeploy: build container kind-load-image
 	kubectl rollout restart deploy cloud-gateway-controller
+
+.PHONY: deploy-controller-gatewayclass
+deploy-controller-gatewayclass:
+	kubectl apply -f test-data/gateway-class.yaml
+
+#################
+.PHONY: deploy-test-app
+deploy-test-app:
+	helm template foo gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --version 0.2.6 --values test-data/user-gateway-values.yaml | kubectl apply -f -
+	kubectl apply -f test-data/test-app.yaml
