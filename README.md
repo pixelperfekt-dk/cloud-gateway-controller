@@ -40,6 +40,13 @@ Deploy controller:
 make kind-load-image deploy-controller
 ```
 
+To watch the progress ans resources created, it can be convenient to watch for
+resources with the following command:
+
+```
+watch kubectl get gateway,httproute,ingress,po,gatewayclass
+```
+
 Deploy `GatewayClass` and a `ConfigMap` referenced by the `GatewayClass`. This
 provides configuration for the controller:
 
@@ -66,14 +73,6 @@ Deploy a test application that matches the deployed `HTTPRoute`:
 ```
 kubectl apply -f test-data/test-app.yaml
 ```
-
-*** The following is still work in progress
-
-```
-kubectl apply -f test-data/wip.yaml
-```
-
-*** End WIP section
 
 Test access to test application:
 

@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-
 )
 
 const (
@@ -26,8 +25,48 @@ const (
 )
 
 type Controller interface {
-	Client()        client.Client
+	Client() client.Client
 	DynamicClient() dynamic.Interface
+}
+
+func lookupGatewayClass(r Controller, ctx context.Context, className gateway.ObjectName) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
+	log := log.FromContext(ctx)
+
+	classes := &gateway.GatewayClassList{}
+	err := r.Client().List(ctx, classes, client.InNamespace(metav1.NamespaceAll))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Look for a matching GatewayClass that are implemented by us
+	var gwclass *gateway.GatewayClass
+	for _, gwc := range classes.Items {
+		if gwc.Spec.ControllerName == SelfControllerName && gwc.ObjectMeta.Name == string(className) {
+			log.Info("defined by", "gatewayclass", gwc)
+			gwclass = &gwc
+			break
+		}
+	}
+
+	if gwclass == nil {
+		return nil, nil, nil
+	}
+
+	log.Info("lookupGatewayClass", "gatewayclasses", gwclass)
+
+	// Lookup associated ConfigMap
+	var configmap *corev1.ConfigMap
+	if gwclass.Spec.ParametersRef != nil {
+		configmap = &corev1.ConfigMap{}
+		// TODO: Check parametersref group+kind is configmap
+		err := r.Client().Get(ctx, types.NamespacedName{string(*gwclass.Spec.ParametersRef.Namespace), gwclass.Spec.ParametersRef.Name}, configmap)
+		if err != nil {
+			return gwclass, nil, err
+		}
+		log.Info("lookupGatewayClass", "configmap", configmap.Data)
+	}
+
+	return gwclass, configmap, nil
 }
 
 func patch(r Controller, ctx context.Context, us *unstructured.Unstructured, namespace string) error {
