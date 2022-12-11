@@ -12,18 +12,18 @@ import (
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-type HTTPRouteReconciler struct {
+type GatewayClassReconciler struct {
 	client        client.Client
 	dynamicClient dynamic.Interface
 	Scheme        *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=httproutes/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=httproutes/finalizers,verbs=update
+//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=gatewayclasses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=gatewayclasses/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=gatewayclasses/finalizers,verbs=update
 
-func NewHTTPRouteController(mgr ctrl.Manager) *HTTPRouteReconciler {
-	r := &HTTPRouteReconciler{
+func NewGatewayClassController(mgr ctrl.Manager) *GatewayClassReconciler {
+	r := &GatewayClassReconciler{
 		client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
 		Scheme:        mgr.GetScheme(),
@@ -31,23 +31,23 @@ func NewHTTPRouteController(mgr ctrl.Manager) *HTTPRouteReconciler {
 	return r
 }
 
-func (r *HTTPRouteReconciler) Client() client.Client {
+func (r *GatewayClassReconciler) Client() client.Client {
 	return r.client
 }
 
-func (r *HTTPRouteReconciler) DynamicClient() dynamic.Interface {
+func (r *GatewayClassReconciler) DynamicClient() dynamic.Interface {
 	return r.dynamicClient
 }
 
-func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	rt := &gateway.HTTPRoute{}
-	err := r.client.Get(ctx, req.NamespacedName, rt)
+	gwc := &gateway.GatewayClass{}
+	err := r.client.Get(ctx, req.NamespacedName, gwc)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("reconcile", "httproute", rt)
+	log.Info("reconcile", "gatewayclass", gwc)
 
 	// gw, err := r.gatewayLister.Gateways(req.Namespace).Get(req.Name)
 	// if err != nil || gw == nil {
@@ -64,9 +64,8 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *HTTPRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *GatewayClassReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&gateway.HTTPRoute{}).
-		Owns(&gateway.HTTPRoute{}).
+		For(&gateway.GatewayClass{}).
 		Complete(r)
 }

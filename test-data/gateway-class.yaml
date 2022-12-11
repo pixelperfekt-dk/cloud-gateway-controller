@@ -32,6 +32,6 @@ data:
             pathType: Prefix
             backend:
               service:
-                name: {{ .Name }}
+                name: {{ .Name }}-istio
                 port:
                   number: 80

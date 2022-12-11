@@ -74,17 +74,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.GatewayReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	gwcctrl := controllers.NewGatewayClassController(mgr)
+	if err = gwcctrl.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GatewayClassController")
+		os.Exit(1)
+	}
+	gwctrl := controllers.NewGatewayController(mgr)
+	if err = gwctrl.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayController")
 		os.Exit(1)
 	}
-	if err = (&controllers.HTTPRouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	rtctrl := controllers.NewHTTPRouteController(mgr)
+	if err = rtctrl.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HTTPRouteController")
 		os.Exit(1)
 	}

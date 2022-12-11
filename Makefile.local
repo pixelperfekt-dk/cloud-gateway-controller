@@ -22,6 +22,8 @@ gateway-api-upstream-get:
 deploy-gateway-api:
 	kubectl apply -f upstream-gateway-api-crds
 	kubectl apply -f upstream-gateway-api-webhook
+	echo "Waiting for gateway-api admission server to be ready"
+	kubectl -ngateway-system wait --for=condition=Available deploy gateway-api-admission-server
 
 #################
 .PHONY: deploy-contour

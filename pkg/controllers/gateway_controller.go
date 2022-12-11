@@ -1,34 +1,28 @@
 package controllers
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
+
 	corev1 "k8s.io/api/core/v1"
-	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"text/template"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-)
 
-const (
-	SelfControllerName gateway.GatewayController = "github.com/pixelperfekt-dk/cloud-gateway-controller"
 )
 
 type GatewayReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	client        client.Client
+	dynamicClient dynamic.Interface
+	Scheme        *runtime.Scheme
 }
 
 type albTemplateValues struct {
@@ -39,6 +33,24 @@ type albTemplateValues struct {
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/finalizers,verbs=update
+
+func NewGatewayController(mgr ctrl.Manager) *GatewayReconciler {
+	r := &GatewayReconciler{
+		client:        mgr.GetClient(),
+		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
+		Scheme:        mgr.GetScheme(),
+	}
+	return r
+}
+
+func (r *GatewayReconciler) Client() client.Client {
+	return r.client
+}
+
+func (r *GatewayReconciler) DynamicClient() dynamic.Interface {
+	return r.dynamicClient
+}
+
 
 func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *corev1.ConfigMap) (*gateway.Gateway, error) {
 	name := fmt.Sprintf("%s-%s", gw_in.ObjectMeta.Name, configmap.Data["tier2GatewayClass"])
@@ -54,55 +66,18 @@ func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *
 	return gw_out, nil
 }
 
-func (r *GatewayReconciler) constructAlbTemplate(gw_in, gw_out *gateway.Gateway, configmap *corev1.ConfigMap) (*unstructured.Unstructured, error) {
-	var buf bytes.Buffer
-	tmpl, found := configmap.Data["albTemplate"]
-	if !found {
-		// TODO return error
-		return nil, nil
-	}
-	ptmpl, err := template.New("alb").Parse(tmpl)
-	if err != nil {
-		// TODO log
-		return nil, err
-	}
-	input := &albTemplateValues{gw_out}
-	err = ptmpl.Execute(io.Writer(&buf), input)
-	if err != nil {
-		// TODO log
-		return nil, err
-	}
-	data := map[string]any{}
-	err = yaml.Unmarshal(buf.Bytes(), &data)
-	if err != nil {
-		return nil, err
-	}
-	us := unstructured.Unstructured{Object: data}
-	return &us, nil
-}
-
-// 	gvr, err := controllers.UnstructuredToGVR(us)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	j, err := json.Marshal(us.Object)
-// 	if err != nil {
-// 		return err
-// 	}
-// }
-
 func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	gw := &gateway.Gateway{}
-	err := r.Get(ctx, req.NamespacedName, gw)
+	err := r.client.Get(ctx, req.NamespacedName, gw)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log.Info("reconcile", "gateway", gw)
 
 	classes := &gateway.GatewayClassList{}
-	err = r.List(ctx, classes, client.InNamespace(metav1.NamespaceAll))
+	err = r.client.List(ctx, classes, client.InNamespace(metav1.NamespaceAll))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -123,76 +98,62 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		configmap := &corev1.ConfigMap{}
 		if gwclass.Spec.ParametersRef != nil {
 			// TODO: Check parametersref group+kind is configmap
-			err := r.Get(ctx, types.NamespacedName{string(*gwclass.Spec.ParametersRef.Namespace), gwclass.Spec.ParametersRef.Name}, configmap)
+			err := r.client.Get(ctx, types.NamespacedName{string(*gwclass.Spec.ParametersRef.Namespace), gwclass.Spec.ParametersRef.Name}, configmap)
 			if err != nil {
 				return ctrl.Result{}, client.IgnoreNotFound(err)
 			}
 		}
 		log.Info("configured by", "configmap", configmap.Data)
 
-		// FIXME test not already existing
+		// Create Gateway resource
 		gw_out, err := r.constructGateway(gw, configmap)
 		if err != nil {
 			log.Error(err, "unable to build Gateway object", "gateway", gw)
 			return ctrl.Result{}, err
 		}
+
+		log.Info("create gateway", "gw_out", gw_out)
+
 		if err := ctrl.SetControllerReference(gw, gw_out, r.Scheme); err != nil {
-			log.Error(err, "unable to set controllerreference for Gateway", "gateway", gw_out)
+			log.Error(err, "unable to set controllerreference for gw template", "gw_out", gw_out)
 			return ctrl.Result{}, err
 		}
 
-		// Create Gateway resource
-
 		gw_found := &gateway.Gateway{}
-		err = r.Get(ctx, types.NamespacedName{Name: gw_out.Name, Namespace: gw_out.Namespace}, gw_found)
+		err = r.client.Get(ctx, types.NamespacedName{Name: gw_out.Name, Namespace: gw_out.Namespace}, gw_found)
 		if err != nil && errors.IsNotFound(err) {
 			log.Info("create gateway")
-			if err := r.Create(ctx, gw_out); err != nil {
+			if err := r.client.Create(ctx, gw_out); err != nil {
 				log.Error(err, "unable to create Gateway", "gateway", gw_out)
 				return ctrl.Result{}, err
 			}
 		} else if err == nil {
-			// TODO: Compare gw_out and gw_found, if not equal, update
+			gw_found.Spec = gw_out.Spec
 			log.Info("update gateway", "gw", gw_found)
-			if err := r.Update(ctx, gw_out); err != nil {
-				log.Error(err, "unable to update Gateway", "gateway", gw_out)
+			if err := r.client.Update(ctx, gw_found); err != nil {
+				log.Error(err, "unable to update Gateway", "gateway", gw_found)
 				return ctrl.Result{}, err
 			}
 		}
 
 		// Create ALB resource
-		alb_u, err := r.constructAlbTemplate(gw, gw_out, configmap)
+		alb_u, err := renderTemplate(r, gw, configmap, "albTemplate")
+		if err != nil {
+			log.Error(err, "unable to set render alb template")
+			return ctrl.Result{}, err
+		}
 
-		log.Info("create alb", "alb_u_kind", alb_u.GetKind())
+		log.Info("create alb", "alb_u", alb_u)
 
 		if err := ctrl.SetControllerReference(gw, alb_u, r.Scheme); err != nil {
 			log.Error(err, "unable to set controllerreference for alb template", "alb_u", alb_u)
 			return ctrl.Result{}, err
 		}
 
-		ing := &netv1.Ingress{}
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(alb_u.Object, &ing)
-		if err != nil {
+		if err := patch(r, ctx, alb_u, gw.ObjectMeta.Namespace); err != nil {
+			log.Error(err, "unable to patch", "alb_u", alb_u)
 			return ctrl.Result{}, err
 		}
-
-		ing_found := &netv1.Ingress{}
-		err = r.Get(ctx, types.NamespacedName{Name: ing.Name, Namespace: ing.Namespace}, ing_found)
-		if err != nil && errors.IsNotFound(err) {
-			log.Info("create ingress")
-			if err := r.Create(ctx, ing); err != nil {
-				log.Error(err, "unable to create Ingress", "inress", ing)
-				return ctrl.Result{}, err
-			}
-		} else if err == nil {
-			// TODO: Compare ing and ing_found, if not equal, update
-			log.Info("update ingress", "ing", ing_found)
-			if err := r.Update(ctx, ing); err != nil {
-				log.Error(err, "unable to update Ingress", "ingress", ing)
-				return ctrl.Result{}, err
-			}
-		}
-
 	}
 
 	return ctrl.Result{}, nil
@@ -201,5 +162,6 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *GatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gateway.Gateway{}).
+		Owns(&gateway.Gateway{}). // FIXME, more types
 		Complete(r)
 }
