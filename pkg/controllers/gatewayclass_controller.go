@@ -3,12 +3,14 @@ package controllers
 import (
 	"context"
 
+	meta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	//"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	//"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -40,26 +42,37 @@ func (r *GatewayClassReconciler) DynamicClient() dynamic.Interface {
 }
 
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	//log := log.FromContext(ctx)
 
-	gwc := &gateway.GatewayClass{}
-	err := r.client.Get(ctx, req.NamespacedName, gwc)
+	// gwc := &gateway.GatewayClass{}
+	// err := r.client.Get(ctx, req.NamespacedName, gwc)
+	// if err != nil {
+	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+	// }
+	// log.Info("reconcile", "gatewayclass", gwc)
+
+	gwc, configmap, err := lookupGatewayClass(r, ctx, req.Name)
 	if err != nil {
+		return ctrl.Result{}, err
+	} else if gwc == nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("reconcile", "gatewayclass", gwc)
 
-	// gw, err := r.gatewayLister.Gateways(req.Namespace).Get(req.Name)
-	// if err != nil || gw == nil {
-	// 	// we'll ignore not-found errors, since they can't be fixed by an immediate
-	// 	// requeue (we'll need to wait for a new notification), and we can get them
-	// 	// on deleted requests.
-	// 	if err := controllers.IgnoreNotFound(err); err != nil {
-	// 		log.Errorf("unable to fetch Gateway: %v", err)
-	// 		return err
-	// 	}
-	// 	return nil
-	// }
+	if configmap == nil {
+	    meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
+		    Type:   string(gateway.GatewayClassConditionStatusAccepted),
+		    Status: "False",
+		    Reason: string(gateway.GatewayClassReasonInvalidParameters)})
+	} else {
+	    meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
+		    Type:   string(gateway.GatewayClassConditionStatusAccepted),
+		    Status: "True",
+		    Reason: string(gateway.GatewayClassReasonAccepted)})
+	}
+	err = r.client.Status().Update(ctx, gwc)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }

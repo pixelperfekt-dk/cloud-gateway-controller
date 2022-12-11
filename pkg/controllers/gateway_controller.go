@@ -75,7 +75,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log.Info("reconcile", "gateway", gw)
 
 	// Lookup class and configuration
-	gwclass, configmap, err := lookupGatewayClass(r, ctx, gw.Spec.GatewayClassName)
+	gwclass, configmap, err := lookupGatewayClass(r, ctx, string(gw.Spec.GatewayClassName))
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if gwclass == nil || configmap == nil {

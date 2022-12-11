@@ -29,7 +29,7 @@ type Controller interface {
 	DynamicClient() dynamic.Interface
 }
 
-func lookupGatewayClass(r Controller, ctx context.Context, className gateway.ObjectName) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
+func lookupGatewayClass(r Controller, ctx context.Context, className string) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
 	classes := &gateway.GatewayClassList{}
@@ -41,7 +41,7 @@ func lookupGatewayClass(r Controller, ctx context.Context, className gateway.Obj
 	// Look for a matching GatewayClass that are implemented by us
 	var gwclass *gateway.GatewayClass
 	for _, gwc := range classes.Items {
-		if gwc.Spec.ControllerName == SelfControllerName && gwc.ObjectMeta.Name == string(className) {
+		if gwc.Spec.ControllerName == SelfControllerName && gwc.ObjectMeta.Name == className {
 			log.Info("defined by", "gatewayclass", gwc)
 			gwclass = &gwc
 			break
