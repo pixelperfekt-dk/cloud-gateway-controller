@@ -4,12 +4,31 @@ default: build
 #################
 # KIND-based setup with controller in-cluster
 .PHONY: all-setup
-all-setup: build container create-cluster deploy-gateway-api kind-load-image deploy-istio deploy-controller deploy-contour deploy-controller-gatewayclass deploy-test-app
+all-setup: build container common-setup kind-load-image deploy-controller deploy-test-app
 
 # Setup with controller running locally
 .PHONY: all-setup-local
-all-setup-local: build create-cluster deploy-gateway-api deploy-istio deploy-contour deploy-controller-gatewayclass deploy-test-app
+all-setup-local: build common-setup deploy-test-app
 
+.PHONY: common-setup
+common-setup: create-cluster deploy-gateway-api deploy-istio deploy-contour deploy-controller-gatewayclass deploy-cert-manager
+
+#################
+.PHONY: create-cluster
+create-cluster:
+	kind create cluster --config test-data/kind-config.yaml
+
+.PHONY: delete-cluster
+delete-cluster:
+	kind delete cluster
+
+.PHONY: kind-load-image
+kind-load-image:
+	kind load docker-image ghcr.io/pixelperfekt-dk/cloud-gateway-controller:$(VERSION)__linux_amd64
+
+.PHONY: kind-list-images
+kind-list-images:
+	docker exec -it kind-control-plane crictl images
 #################
 
 ifeq ($(GATEWAY_API_VERSION),)
@@ -31,6 +50,24 @@ deploy-gateway-api:
 	kubectl -ngateway-system wait --for=condition=Available --timeout=120s deploy gateway-api-admission-server
 
 #################
+.PHONY: deploy-cert-manager
+deploy-cert-manager: cert cert-secret-create
+	helm upgrade -i --repo https://charts.jetstack.io cert-manager cert-manager --version v1.10.1 -n cert-manager --set installCRDs=true
+	kubectl apply -f test-data/cert-manager-issuer.yaml
+
+.PHONY: cert
+cert:
+	openssl req -x509 -nodes -subj '/C=DK/ST=ACMEprov/L=ACMEloc/O=ACMEcompany/OU=ACMEorg/CN=example.com' -days 365 -newkey rsa:2048 -keyout example-com.key -out example-com.crt
+	chmod 644 example-com.crt
+	chmod 600 example-com.key
+	openssl x509 -in example-com.crt -text -noout
+
+.PHONY: cert-secret-create
+cert-secret-create:
+	kubectl create ns cert-manager
+	kubectl -n cert-manager create secret tls ca-key-pair --cert=example-com.crt --key=example-com.key
+
+#################
 .PHONY: deploy-contour
 deploy-contour:
 	helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -45,21 +82,10 @@ deploy-contour-provisioner:
 	kubectl apply -f test-data/contour-gatewayclass.yaml
 
 #################
-.PHONY: create-cluster
-create-cluster:
-	kind create cluster --config test-data/kind-config.yaml
-
-.PHONY: delete-cluster
-delete-cluster:
-	kind delete cluster
-
-.PHONY: kind-load-image
-kind-load-image:
-	kind load docker-image ghcr.io/pixelperfekt-dk/cloud-gateway-controller:$(VERSION)__linux_amd64
-
-.PHONY: kind-list-images
-kind-list-images:
-	docker exec -it kind-control-plane crictl images
+.PHONY: deploy-envoyproxy
+deploy-envoyproxy:
+	kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/latest/install.yaml
+	kubectl -n envoy-gateway-system wait --for=condition=Available --timeout=5m deploy envoy-gateway
 
 #################
 .PHONY: deploy-istio

@@ -17,7 +17,7 @@ import (
 type GatewayClassReconciler struct {
 	client        client.Client
 	dynamicClient dynamic.Interface
-	Scheme        *runtime.Scheme
+	scheme        *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=gatewayclasses,verbs=get;list;watch;create;update;patch;delete
@@ -28,7 +28,7 @@ func NewGatewayClassController(mgr ctrl.Manager) *GatewayClassReconciler {
 	r := &GatewayClassReconciler{
 		client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
-		Scheme:        mgr.GetScheme(),
+		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
@@ -39,6 +39,10 @@ func (r *GatewayClassReconciler) Client() client.Client {
 
 func (r *GatewayClassReconciler) DynamicClient() dynamic.Interface {
 	return r.dynamicClient
+}
+
+func (r *GatewayClassReconciler) Scheme() *runtime.Scheme {
+	return r.scheme
 }
 
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

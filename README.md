@@ -19,6 +19,16 @@ The controller have several similarities with [GKE Gateway
 controller](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gateway_controller),
 except this controller aims at being cloud agnostic.
 
+## Objective
+
+
+
+## Why Not Use e.g. Crossplane or Helm?
+
+An important objective of the cloud-gateway-controller is to maintain
+a Gateway-API compatible interface towards users. This would not be
+possible with techniques such as Crossplane and Helm.
+
 ## Building
 
 ```
@@ -28,10 +38,12 @@ make gateway-api-upstream-get
 
 ## Deploying
 
-Setup test environment (using Istio for the 'shadow' gateway-class):
+Setup test environment, which use Istio for the 'shadow'
+gateway-class, Contour for the front load balancer and cert-manager to
+issue TLS certificates:
 
 ```
-make create-cluster deploy-gateway-api deploy-istio deploy-contour
+make create-cluster deploy-gateway-api deploy-istio deploy-contour deploy-cert-manager
 ```
 
 Deploy controller:
@@ -44,7 +56,7 @@ To watch the progress ans resources created, it can be convenient to watch for
 resources with the following command:
 
 ```
-watch kubectl get gateway,httproute,ingress,po,gatewayclass
+watch kubectl get gateway,httproute,ingress,certificate,secret,po,gatewayclass
 ```
 
 Deploy `GatewayClass` and a `ConfigMap` referenced by the `GatewayClass`. This
@@ -57,7 +69,7 @@ kubectl apply -f test-data/gateway-class.yaml
 Deploy an example `Gateway` and `HTTPRoute` with the following command. You can
 review the `Gateway` and `HTTPRoute` resources by leaving out the `kubectl apply
 -f -` part:
- 
+
 ```
 helm template foo gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/user-gateway-values.yaml | kubectl apply -f -
 ```
@@ -77,7 +89,14 @@ kubectl apply -f test-data/test-app.yaml
 Test access to test application:
 
 ```
-curl -H 'Host: example.com' localhost/foo
+curl --resolve example.com:80:127.0.0.1 http://example.com/foo
 ```
 
 Expect to see a `foo-bar` being echo'ed.
+
+Similarly, but using HTTPS through the cert-manager issued
+certificate:
+
+```
+curl --cacert example-com.crt --resolve example.com:443:127.0.0.1 https://example.com/foo
+```

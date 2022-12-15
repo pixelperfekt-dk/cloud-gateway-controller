@@ -12,9 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -27,6 +29,7 @@ const (
 type Controller interface {
 	Client() client.Client
 	DynamicClient() dynamic.Interface
+	Scheme() *runtime.Scheme
 }
 
 func lookupGatewayClass(r Controller, ctx context.Context, className string) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
@@ -138,4 +141,26 @@ func renderTemplate(r Controller, gwParent *gateway.Gateway, configmap *corev1.C
 	}
 	us := unstructured.Unstructured{Object: data}
 	return &us, nil
+}
+
+func createUpdateFromTemplate(r Controller, ctx context.Context, gwParent *gateway.Gateway, configmap *corev1.ConfigMap, configmapKey string) error {
+	log := log.FromContext(ctx)
+	obj_u, err := renderTemplate(r, gwParent, configmap, configmapKey)
+	if err != nil {
+		log.Error(err, "unable to render template", "templateKey", configmapKey)
+		return err
+	}
+
+	log.Info("create obj", "obj_u", obj_u)
+
+	if err := ctrl.SetControllerReference(gwParent, obj_u, r.Scheme()); err != nil {
+		log.Error(err, "unable to set controllerreference for obj", "obj_u", obj_u)
+		return err
+	}
+
+	if err := patch(r, ctx, obj_u, gwParent.ObjectMeta.Namespace); err != nil {
+		log.Error(err, "unable to patch", "obj_u", obj_u)
+		return err
+	}
+	return nil
 }

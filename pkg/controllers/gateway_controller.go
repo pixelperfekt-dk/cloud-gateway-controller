@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	//"k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/scheme"
 	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,6 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	//"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -21,7 +23,7 @@ import (
 type GatewayReconciler struct {
 	client        client.Client
 	dynamicClient dynamic.Interface
-	Scheme        *runtime.Scheme
+	scheme        *runtime.Scheme
 }
 
 type albTemplateValues struct {
@@ -37,7 +39,7 @@ func NewGatewayController(mgr ctrl.Manager) *GatewayReconciler {
 	r := &GatewayReconciler{
 		client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
-		Scheme:        mgr.GetScheme(),
+		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
@@ -48,6 +50,10 @@ func (r *GatewayReconciler) Client() client.Client {
 
 func (r *GatewayReconciler) DynamicClient() dynamic.Interface {
 	return r.dynamicClient
+}
+
+func (r *GatewayReconciler) Scheme() *runtime.Scheme {
+	return r.scheme
 }
 
 func (r *GatewayReconciler) constructGateway(gw_in *gateway.Gateway, configmap *corev1.ConfigMap) (*gateway.Gateway, error) {
@@ -91,7 +97,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("create gateway", "gw_out", gw_out)
 
-	if err := ctrl.SetControllerReference(gw, gw_out, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(gw, gw_out, r.Scheme()); err != nil {
 		log.Error(err, "unable to set controllerreference for gateway", "gw_out", gw_out)
 		return ctrl.Result{}, err
 	}
@@ -114,21 +120,33 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Create ALB resource
-	alb_u, err := renderTemplate(r, gw, configmap, "albTemplate")
+	err = createUpdateFromTemplate(r, ctx, gw, configmap, "albTemplate")
 	if err != nil {
-		log.Error(err, "unable to set render alb template")
+		log.Error(err, "unable to build alb object", "gateway", gw)
 		return ctrl.Result{}, err
 	}
+	// alb_u, err := renderTemplate(r, gw, configmap, "albTemplate")
+	// if err != nil {
+	// 	log.Error(err, "unable to set render alb template")
+	// 	return ctrl.Result{}, err
+	// }
 
-	log.Info("create alb", "alb_u", alb_u)
+	// log.Info("create alb", "alb_u", alb_u)
 
-	if err := ctrl.SetControllerReference(gw, alb_u, r.Scheme); err != nil {
-		log.Error(err, "unable to set controllerreference for alb template", "alb_u", alb_u)
-		return ctrl.Result{}, err
-	}
+	// if err := ctrl.SetControllerReference(gw, alb_u, r.Scheme()); err != nil {
+	// 	log.Error(err, "unable to set controllerreference for alb template", "alb_u", alb_u)
+	// 	return ctrl.Result{}, err
+	// }
 
-	if err := patch(r, ctx, alb_u, gw.ObjectMeta.Namespace); err != nil {
-		log.Error(err, "unable to patch", "alb_u", alb_u)
+	// if err := patch(r, ctx, alb_u, gw.ObjectMeta.Namespace); err != nil {
+	// 	log.Error(err, "unable to patch", "alb_u", alb_u)
+	// 	return ctrl.Result{}, err
+	// }
+
+	// Create TLS certificate resource
+	err = createUpdateFromTemplate(r, ctx, gw, configmap, "tlsCertificateTemplate")
+	if err != nil {
+		log.Error(err, "unable to build certificate object", "gateway", gw)
 		return ctrl.Result{}, err
 	}
 

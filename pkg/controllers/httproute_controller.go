@@ -20,7 +20,7 @@ import (
 type HTTPRouteReconciler struct {
 	client        client.Client
 	dynamicClient dynamic.Interface
-	Scheme        *runtime.Scheme
+	scheme        *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=gateway.networking.k8s.io.tutorial.kubebuilder.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
@@ -31,7 +31,7 @@ func NewHTTPRouteController(mgr ctrl.Manager) *HTTPRouteReconciler {
 	r := &HTTPRouteReconciler{
 		client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
-		Scheme:        mgr.GetScheme(),
+		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
@@ -42,6 +42,10 @@ func (r *HTTPRouteReconciler) Client() client.Client {
 
 func (r *HTTPRouteReconciler) DynamicClient() dynamic.Interface {
 	return r.dynamicClient
+}
+
+func (r *HTTPRouteReconciler) Scheme() *runtime.Scheme {
+	return r.scheme
 }
 
 func (r *HTTPRouteReconciler) constructHTTPRoute(rt_in *gateway.HTTPRoute, configmap *corev1.ConfigMap) (*gateway.HTTPRoute, error) {
@@ -68,7 +72,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if strings.HasSuffix(rt.ObjectMeta.Name, "-istio") {
 		return ctrl.Result{}, nil
 	}
-	
+
 	log.Info("reconcile", "httproute", rt)
 
 	// Lookup class and configuration
@@ -89,7 +93,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	log.Info("create httproute", "rt_out", rt_out)
 
-	if err := ctrl.SetControllerReference(rt, rt_out, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(rt, rt_out, r.Scheme()); err != nil {
 		log.Error(err, "unable to set controllerreference for httproute", "rt_out", rt_out)
 		return ctrl.Result{}, err
 	}

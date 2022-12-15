@@ -25,8 +25,13 @@ data:
       namespace: {{ .Namespace }}
     spec:
       ingressClassName: contour
+      tls:
+      - hosts:
+        - example.com
+        secretName: {{ .Name }}-tls
       rules:
-      - http:
+      - host: example.com
+        http:
           paths:
           - path: /
             pathType: Prefix
@@ -35,3 +40,32 @@ data:
                 name: {{ .Name }}-istio
                 port:
                   number: 80
+  tlsCertificateTemplate: |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: {{ .Name }}-cert
+      namespace: {{ .Namespace }}
+    spec:
+      # Secret names are always required.
+      secretName: {{ .Name }}-tls
+
+      duration: 2160h # 90d
+      renewBefore: 360h # 15d
+      subject:
+        organizations:
+          - acme-example-corp
+      isCA: false
+      privateKey:
+        algorithm: RSA
+        encoding: PKCS1
+        size: 2048
+      usages:
+        - server auth
+        - client auth
+      dnsNames:
+        - example.com
+      issuerRef:
+        name: ca-issuer
+        kind: ClusterIssuer
+        group: cert-manager.io
