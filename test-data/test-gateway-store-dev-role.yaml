@@ -1,0 +1,15 @@
+gateway:
+  name: foo-gateway
+  namespace: foo-infra
+
+httproutes:
+  foo-store:
+    uriprefix: "/store"
+    rules:
+    - backendRefs:
+      - name: foo-store-v1
+        port: 80
+        weight: 90
+      - name: foo-store-v2
+        port: 80
+        weight: 10

@@ -57,23 +57,20 @@ deploy-cert-manager: cert cert-secret-create
 
 .PHONY: cert
 cert:
-	openssl req -x509 -nodes -subj '/C=DK/ST=ACMEprov/L=ACMEloc/O=ACMEcompany/OU=ACMEorg/CN=example.com' -days 365 -newkey rsa:2048 -keyout example-com.key -out example-com.crt
-	chmod 644 example-com.crt
-	chmod 600 example-com.key
-	openssl x509 -in example-com.crt -text -noout
+	openssl req -x509 -nodes -subj '/C=DK/ST=ACMEprov/L=ACMEloc/O=ACMEcompany/OU=ACMEorg/CN=foo.example.com' -days 365 -newkey rsa:2048 -keyout foo-example-com.key -out foo-example-com.crt
+	chmod 644 foo-example-com.crt
+	chmod 600 foo-example-com.key
+	openssl x509 -in foo-example-com.crt -text -noout
 
 .PHONY: cert-secret-create
 cert-secret-create:
 	kubectl create ns cert-manager
-	kubectl -n cert-manager create secret tls ca-key-pair --cert=example-com.crt --key=example-com.key
+	kubectl -n cert-manager create secret tls ca-key-pair --cert=foo-example-com.crt --key=foo-example-com.key
 
 #################
 .PHONY: deploy-contour
 deploy-contour:
-	helm repo add bitnami https://charts.bitnami.com/bitnami
-	helm repo update
-	kubectl create namespace projectcontour
-	helm install my-release bitnami/contour --namespace projectcontour
+	helm upgrade -i --repo https://charts.bitnami.com/bitnami contour contour -n projectcontour --create-namespace
 
 # To allow contour to provision from gateway resources
 .PHONY: deploy-contour-provisioner
@@ -90,11 +87,8 @@ deploy-envoyproxy:
 #################
 .PHONY: deploy-istio
 deploy-istio:
-	helm repo add istio https://istio-release.storage.googleapis.com/charts
-	helm repo update
-	kubectl create namespace istio-system
-	helm install istio-base istio/base -n istio-system
-	helm install istiod istio/istiod -n istio-system
+	helm upgrade -i --repo https://istio-release.storage.googleapis.com/charts base base     --version 1.16.1 -n istio-system --create-namespace
+	helm upgrade -i --repo https://istio-release.storage.googleapis.com/charts istiod istiod --version 1.16.1 -n istio-system
 
 #################
 .PHONY: deploy-controller

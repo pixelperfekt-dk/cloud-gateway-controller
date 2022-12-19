@@ -125,23 +125,6 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to build alb object", "gateway", gw)
 		return ctrl.Result{}, err
 	}
-	// alb_u, err := renderTemplate(r, gw, configmap, "albTemplate")
-	// if err != nil {
-	// 	log.Error(err, "unable to set render alb template")
-	// 	return ctrl.Result{}, err
-	// }
-
-	// log.Info("create alb", "alb_u", alb_u)
-
-	// if err := ctrl.SetControllerReference(gw, alb_u, r.Scheme()); err != nil {
-	// 	log.Error(err, "unable to set controllerreference for alb template", "alb_u", alb_u)
-	// 	return ctrl.Result{}, err
-	// }
-
-	// if err := patch(r, ctx, alb_u, gw.ObjectMeta.Namespace); err != nil {
-	// 	log.Error(err, "unable to patch", "alb_u", alb_u)
-	// 	return ctrl.Result{}, err
-	// }
 
 	// Create TLS certificate resource
 	err = createUpdateFromTemplate(r, ctx, gw, configmap, "tlsCertificateTemplate")

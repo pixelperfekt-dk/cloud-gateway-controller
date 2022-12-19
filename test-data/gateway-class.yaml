@@ -27,10 +27,10 @@ data:
       ingressClassName: contour
       tls:
       - hosts:
-        - example.com
+        - foo.example.com
         secretName: {{ .Name }}-tls
       rules:
-      - host: example.com
+      - host: foo.example.com
         http:
           paths:
           - path: /
@@ -47,7 +47,6 @@ data:
       name: {{ .Name }}-cert
       namespace: {{ .Namespace }}
     spec:
-      # Secret names are always required.
       secretName: {{ .Name }}-tls
 
       duration: 2160h # 90d
@@ -64,7 +63,7 @@ data:
         - server auth
         - client auth
       dnsNames:
-        - example.com
+        - foo.example.com
       issuerRef:
         name: ca-issuer
         kind: ClusterIssuer

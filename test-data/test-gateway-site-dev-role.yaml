@@ -1,0 +1,9 @@
+gateway:
+  name: foo-gateway
+  namespace: foo-infra
+
+httproutes:
+  foo-site:
+    uriprefix: "/site"
+    destination:
+      name: foo-site

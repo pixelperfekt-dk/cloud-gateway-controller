@@ -54,7 +54,7 @@ func (r *HTTPRouteReconciler) constructHTTPRoute(rt_in *gateway.HTTPRoute, confi
 	rt_out.ResourceVersion = ""
 	rt_out.ObjectMeta.Name = name
 	// FIXME, should follow pattern in gateway-controller and remap parents of type gateway similarly
-	rt_out.Spec.CommonRouteSpec.ParentRefs[0].Name = "foo-gateway-api-istio"
+	rt_out.Spec.CommonRouteSpec.ParentRefs[0].Name = "foo-gateway-istio"
 
 	return rt_out, nil
 }
