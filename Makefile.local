@@ -113,5 +113,14 @@ deploy-controller-gatewayclass:
 #################
 .PHONY: deploy-test-app
 deploy-test-app:
-	helm template foo gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --version 0.2.6 --values test-data/user-gateway-values.yaml | kubectl apply -f -
-	kubectl apply -f test-data/test-app.yaml
+	kubectl apply -f test-data/foo-namespaces.yaml
+	kubectl -n foo-site  apply -f test-data/test-app-site.yaml
+	kubectl -n foo-store apply -f test-data/test-app-store-v1.yaml
+	kubectl -n foo-store apply -f test-data/test-app-store-v2.yaml
+	helm template -n foo-infra  foo-gateway gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/test-gateway-sre-role.yaml | kubectl apply -f -
+	helm template -n foo-site foo-site    gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/test-gateway-site-dev-role.yaml | kubectl apply -f -
+	helm template -n foo-store foo-store    gateway-api --repo https://pixelperfekt-dk.github.io/helm-charts --values test-data/test-gateway-store-dev-role.yaml | kubectl apply -f -
+
+.PHONY: undeploy-test-app
+undeploy-test-app:
+	kubectl delete -f test-data/foo-namespaces.yaml
