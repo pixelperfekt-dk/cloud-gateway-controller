@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -67,17 +66,20 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
-	// FIXME, need to check with ParentReference if this is our HTTPRoute
-	if strings.HasSuffix(rt.ObjectMeta.Name, "-istio") {
-		return ctrl.Result{}, nil
-	}
-
 	log.Info("reconcile", "httproute", rt)
 
-	// Lookup class and configuration
-	//gwclass, configmap, err := lookupGatewayClass(r, ctx, gw.Spec.GatewayClassName)
-	gwclass, configmap, err := lookupGatewayClass(r, ctx, "cloud-gw")   // FIXME
+	prefs := rt.Spec.CommonRouteSpec.ParentRefs
+	// FIXME check kind of parent ref is Gateway and missing parentRef. Accepts more than one parent ref
+	pref := prefs[0]
+
+	gw := &gateway.Gateway{}
+	err = r.client.Get(ctx, types.NamespacedName{Name: string(pref.Name), Namespace: string(*pref.Namespace)}, gw)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	log.Info("reconcile", "gateway", gw)
+
+	gwclass, configmap, err := lookupGatewayClass(r, ctx, string(gw.Spec.GatewayClassName))
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if gwclass == nil || configmap == nil {
