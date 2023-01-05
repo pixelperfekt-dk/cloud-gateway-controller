@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"text/template"
 
@@ -11,8 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
@@ -35,41 +36,32 @@ type Controller interface {
 func lookupGatewayClass(r Controller, ctx context.Context, className string) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
-	classes := &gateway.GatewayClassList{}
-	err := r.Client().List(ctx, classes, client.InNamespace(metav1.NamespaceAll))
+	var gwc gateway.GatewayClass
+	err := r.Client().Get(ctx, types.NamespacedName{Name: className, Namespace: ""}, &gwc)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("GatewayClass %q not found: %w", className, err)
 	}
 
-	// Look for a matching GatewayClass that are implemented by us
-	var gwclass *gateway.GatewayClass
-	for _, gwc := range classes.Items {
-		if gwc.Spec.ControllerName == SelfControllerName && gwc.ObjectMeta.Name == className {
-			log.Info("defined by", "gatewayclass", gwc)
-			gwclass = &gwc
-			break
-		}
-	}
-
-	if gwclass == nil {
+	if gwc.Spec.ControllerName != SelfControllerName {
 		return nil, nil, nil
 	}
 
-	log.Info("lookupGatewayClass", "gatewayclasses", gwclass)
+	log.Info("lookupGatewayClass", "gatewayclasses", gwc)
 
 	// Lookup associated ConfigMap
 	var configmap *corev1.ConfigMap
-	if gwclass.Spec.ParametersRef != nil {
+	if gwc.Spec.ParametersRef != nil {
 		configmap = &corev1.ConfigMap{}
 		// TODO: Check parametersref group+kind is configmap
-		err := r.Client().Get(ctx, types.NamespacedName{string(*gwclass.Spec.ParametersRef.Namespace), gwclass.Spec.ParametersRef.Name}, configmap)
+		err := r.Client().Get(ctx, types.NamespacedName{Namespace: string(*gwc.Spec.ParametersRef.Namespace),
+			Name: gwc.Spec.ParametersRef.Name}, configmap)
 		if err != nil {
-			return gwclass, nil, err
+			return &gwc, nil, fmt.Errorf("Configmap for GatewayClass not found: %w", err)
 		}
 		log.Info("lookupGatewayClass", "configmap", configmap.Data)
 	}
 
-	return gwclass, configmap, nil
+	return &gwc, configmap, nil
 }
 
 func patch(r Controller, ctx context.Context, us *unstructured.Unstructured, namespace string) error {

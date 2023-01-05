@@ -89,7 +89,7 @@ Deploy `GatewayClass` and a `ConfigMap` referenced by the `GatewayClass`. This
 provides configuration for the controller:
 
 ```
-kubectl apply -f test-data/gateway-class.yaml
+kubectl apply -f test-data/gateway-class.yaml -f test-data/gateway-class-configmap.yaml
 ```
 
 As an example, we will implement the following example usecase from

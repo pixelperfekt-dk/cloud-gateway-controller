@@ -10,6 +10,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	//"sigs.k8s.io/controller-runtime/pkg/log"
+
+	//"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -48,13 +50,6 @@ func (r *GatewayClassReconciler) Scheme() *runtime.Scheme {
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	//log := log.FromContext(ctx)
 
-	// gwc := &gateway.GatewayClass{}
-	// err := r.client.Get(ctx, req.NamespacedName, gwc)
-	// if err != nil {
-	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
-	// }
-	// log.Info("reconcile", "gatewayclass", gwc)
-
 	gwc, configmap, err := lookupGatewayClass(r, ctx, req.Name)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -63,15 +58,15 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if configmap == nil {
-	    meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
-		    Type:   string(gateway.GatewayClassConditionStatusAccepted),
-		    Status: "False",
-		    Reason: string(gateway.GatewayClassReasonInvalidParameters)})
+		meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
+			Type:   string(gateway.GatewayClassConditionStatusAccepted),
+			Status: "False",
+			Reason: string(gateway.GatewayClassReasonInvalidParameters)})
 	} else {
-	    meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
-		    Type:   string(gateway.GatewayClassConditionStatusAccepted),
-		    Status: "True",
-		    Reason: string(gateway.GatewayClassReasonAccepted)})
+		meta.SetStatusCondition(&gwc.Status.Conditions, metav1.Condition{
+			Type:   string(gateway.GatewayClassConditionStatusAccepted),
+			Status: "True",
+			Reason: string(gateway.GatewayClassReasonAccepted)})
 	}
 	err = r.client.Status().Update(ctx, gwc)
 	if err != nil {
