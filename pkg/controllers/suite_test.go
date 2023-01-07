@@ -73,11 +73,13 @@ var _ = BeforeSuite(func() {
 	// Setup GatewayClass
 	cm := &v1.ConfigMap{}
 	cmdata, err := os.ReadFile("../../test-data/gateway-class-configmap.yaml")
+	Expect(err).ToNot(HaveOccurred())
 	_ = yaml.Unmarshal(cmdata, cm)
 	Expect(k8sClient.Create(ctx, cm)).Should(Succeed())
 
 	gwc := &gateway.GatewayClass{}
 	gwcdata, err := os.ReadFile("../../test-data/gateway-class.yaml")
+	Expect(err).ToNot(HaveOccurred())
 	_ = yaml.Unmarshal(gwcdata, gwc)
 	Expect(k8sClient.Create(ctx, gwc)).Should(Succeed())
 

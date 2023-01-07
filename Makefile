@@ -1,4 +1,5 @@
 -include Makefile.local
+-include Makefile.kubebuilder
 
 # Copyright 2016 The Kubernetes Authors.
 #

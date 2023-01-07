@@ -29,18 +29,6 @@ spec:
     protocol: HTTP
     hostname: example.com`
 
-const gatewayclass_manifest string = `
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: GatewayClass
-metadata:
-  name: default
-spec:
-  controllerName: "github.com/pixelperfekt-dk/cloud-gateway-controller"
-  parametersRef:
-    group: v1
-    kind: ConfigMap
-    name: default-gateway-class`
-
 const configmap_manifest string = `
 apiVersion: v1
 kind: ConfigMap
@@ -94,10 +82,7 @@ var _ = Describe("Gateway controller", func() {
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, lookupKey, createdGw)
-				if err != nil {
-					return false
-				}
-				return true
+				return err == nil
 			}, timeout, interval).Should(BeTrue())
 		})
 	})
