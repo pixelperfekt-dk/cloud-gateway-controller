@@ -23,10 +23,6 @@ jobs:
           go-version-file: "go.mod"
           cache: true
 
-      - name: Build
-        run: |
-          go mod download
-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
