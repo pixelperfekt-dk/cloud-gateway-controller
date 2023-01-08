@@ -9,9 +9,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	//"sigs.k8s.io/controller-runtime/pkg/log"
-
-	//"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -50,7 +47,7 @@ func (r *GatewayClassReconciler) Scheme() *runtime.Scheme {
 func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	//log := log.FromContext(ctx)
 
-	gwc, configmap, err := lookupGatewayClass(r, ctx, req.Name)
+	gwc, configmap, err := lookupGatewayClass(ctx, r, req.Name)
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if gwc == nil {

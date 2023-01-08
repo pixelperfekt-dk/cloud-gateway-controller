@@ -33,7 +33,7 @@ type Controller interface {
 	Scheme() *runtime.Scheme
 }
 
-func lookupGatewayClass(r Controller, ctx context.Context, className string) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
+func lookupGatewayClass(ctx context.Context, r Controller, className string) (*gateway.GatewayClass, *corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
 	var gwc gateway.GatewayClass
@@ -56,7 +56,7 @@ func lookupGatewayClass(r Controller, ctx context.Context, className string) (*g
 		err := r.Client().Get(ctx, types.NamespacedName{Namespace: string(*gwc.Spec.ParametersRef.Namespace),
 			Name: gwc.Spec.ParametersRef.Name}, configmap)
 		if err != nil {
-			return &gwc, nil, fmt.Errorf("Configmap for GatewayClass not found: %w", err)
+			return &gwc, nil, fmt.Errorf("configmap for GatewayClass not found: %w", err)
 		}
 		log.Info("lookupGatewayClass", "configmap", configmap.Data)
 	}
@@ -64,9 +64,9 @@ func lookupGatewayClass(r Controller, ctx context.Context, className string) (*g
 	return &gwc, configmap, nil
 }
 
-func patch(r Controller, ctx context.Context, us *unstructured.Unstructured, namespace string) error {
+func patch(ctx context.Context, r Controller, us *unstructured.Unstructured, namespace string) error {
 	log := log.FromContext(ctx)
-	gvr, err := unstructuredToGVR(r, ctx, us)
+	gvr, err := unstructuredToGVR(r, us)
 	if err != nil {
 		log.Error(err, "Cannot convert unstructured to GVR")
 		return err
@@ -87,7 +87,7 @@ func patch(r Controller, ctx context.Context, us *unstructured.Unstructured, nam
 	return err
 }
 
-func unstructuredToGVR(r Controller, ctx context.Context, u *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
+func unstructuredToGVR(r Controller, u *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
 	gv, err := schema.ParseGroupVersion(u.GetAPIVersion())
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func unstructuredToGVR(r Controller, ctx context.Context, u *unstructured.Unstru
 	}, nil
 }
 
-func renderTemplate(r Controller, gwParent *gateway.Gateway, configmap *corev1.ConfigMap, configmapKey string) (*unstructured.Unstructured, error) {
+func renderTemplate(gwParent *gateway.Gateway, configmap *corev1.ConfigMap, configmapKey string) (*unstructured.Unstructured, error) {
 	var buf bytes.Buffer
 	tmpl, found := configmap.Data[configmapKey]
 	if !found {
@@ -135,23 +135,23 @@ func renderTemplate(r Controller, gwParent *gateway.Gateway, configmap *corev1.C
 	return &us, nil
 }
 
-func createUpdateFromTemplate(r Controller, ctx context.Context, gwParent *gateway.Gateway, configmap *corev1.ConfigMap, configmapKey string) error {
+func createUpdateFromTemplate(ctx context.Context, r Controller, gwParent *gateway.Gateway, configmap *corev1.ConfigMap, configmapKey string) error {
 	log := log.FromContext(ctx)
-	obj_u, err := renderTemplate(r, gwParent, configmap, configmapKey)
+	obj, err := renderTemplate(gwParent, configmap, configmapKey)
 	if err != nil {
 		log.Error(err, "unable to render template", "templateKey", configmapKey)
 		return err
 	}
 
-	log.Info("create obj", "obj_u", obj_u)
+	log.Info("create obj", "obj", obj)
 
-	if err := ctrl.SetControllerReference(gwParent, obj_u, r.Scheme()); err != nil {
-		log.Error(err, "unable to set controllerreference for obj", "obj_u", obj_u)
+	if err := ctrl.SetControllerReference(gwParent, obj, r.Scheme()); err != nil {
+		log.Error(err, "unable to set controllerreference for obj", "obj", obj)
 		return err
 	}
 
-	if err := patch(r, ctx, obj_u, gwParent.ObjectMeta.Namespace); err != nil {
-		log.Error(err, "unable to patch", "obj_u", obj_u)
+	if err := patch(ctx, r, obj, gwParent.ObjectMeta.Namespace); err != nil {
+		log.Error(err, "unable to patch", "obj", obj)
 		return err
 	}
 	return nil

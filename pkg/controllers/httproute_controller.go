@@ -12,7 +12,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	//"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -47,15 +46,15 @@ func (r *HTTPRouteReconciler) Scheme() *runtime.Scheme {
 	return r.scheme
 }
 
-func (r *HTTPRouteReconciler) constructHTTPRoute(rt_in *gateway.HTTPRoute, configmap *corev1.ConfigMap) (*gateway.HTTPRoute, error) {
-	name := fmt.Sprintf("%s-%s", rt_in.ObjectMeta.Name, configmap.Data["tier2GatewayClass"])
-	rt_out := rt_in.DeepCopy()
-	rt_out.ResourceVersion = ""
-	rt_out.ObjectMeta.Name = name
+func (r *HTTPRouteReconciler) constructHTTPRoute(rtIn *gateway.HTTPRoute, configmap *corev1.ConfigMap) (*gateway.HTTPRoute, error) {
+	name := fmt.Sprintf("%s-%s", rtIn.ObjectMeta.Name, configmap.Data["tier2GatewayClass"])
+	rtOut := rtIn.DeepCopy()
+	rtOut.ResourceVersion = ""
+	rtOut.ObjectMeta.Name = name
 	// FIXME, should follow pattern in gateway-controller and remap parents of type gateway similarly
-	rt_out.Spec.CommonRouteSpec.ParentRefs[0].Name = "foo-gateway-istio"
+	rtOut.Spec.CommonRouteSpec.ParentRefs[0].Name = "foo-gateway-istio"
 
-	return rt_out, nil
+	return rtOut, nil
 }
 
 func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -79,7 +78,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 	log.Info("reconcile", "gateway", gw)
 
-	gwclass, configmap, err := lookupGatewayClass(r, ctx, string(gw.Spec.GatewayClassName))
+	gwclass, configmap, err := lookupGatewayClass(ctx, r, string(gw.Spec.GatewayClassName))
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if gwclass == nil || configmap == nil {
@@ -87,32 +86,32 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Create HTTPRoute resource
-	rt_out, err := r.constructHTTPRoute(rt, configmap)
+	rtOut, err := r.constructHTTPRoute(rt, configmap)
 	if err != nil {
 		log.Error(err, "unable to build HTTPRoute object", "httproute", rt)
 		return ctrl.Result{}, err
 	}
 
-	log.Info("create httproute", "rt_out", rt_out)
+	log.Info("create httproute", "rtOut", rtOut)
 
-	if err := ctrl.SetControllerReference(rt, rt_out, r.Scheme()); err != nil {
-		log.Error(err, "unable to set controllerreference for httproute", "rt_out", rt_out)
+	if err := ctrl.SetControllerReference(rt, rtOut, r.Scheme()); err != nil {
+		log.Error(err, "unable to set controllerreference for httproute", "rtOut", rtOut)
 		return ctrl.Result{}, err
 	}
 
-	rt_found := &gateway.HTTPRoute{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: rt_out.Name, Namespace: rt_out.Namespace}, rt_found)
+	rtFound := &gateway.HTTPRoute{}
+	err = r.client.Get(ctx, types.NamespacedName{Name: rtOut.Name, Namespace: rtOut.Namespace}, rtFound)
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("create gateway")
-		if err := r.client.Create(ctx, rt_out); err != nil {
-			log.Error(err, "unable to create Gateway", "httproute", rt_out)
+		if err := r.client.Create(ctx, rtOut); err != nil {
+			log.Error(err, "unable to create Gateway", "httproute", rtOut)
 			return ctrl.Result{}, err
 		}
 	} else if err == nil {
-		rt_found.Spec = rt_out.Spec
-		log.Info("update httproute", "rt", rt_found)
-		if err := r.client.Update(ctx, rt_found); err != nil {
-			log.Error(err, "unable to update HTTPRoute", "httproute", rt_found)
+		rtFound.Spec = rtOut.Spec
+		log.Info("update httproute", "rt", rtFound)
+		if err := r.client.Update(ctx, rtFound); err != nil {
+			log.Error(err, "unable to update HTTPRoute", "httproute", rtFound)
 			return ctrl.Result{}, err
 		}
 	}

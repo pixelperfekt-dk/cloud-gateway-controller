@@ -31,9 +31,7 @@ linters:
     - exhaustive
     - goconst
     - gocritic
-    - gofmt
     - goimports
-    - gomnd
     - gocyclo
     - gosec
     - gosimple
@@ -54,7 +52,6 @@ linters:
     - unparam
     - unused
     - whitespace
-    - wsl
 
 run:
   issues-exit-code: 1

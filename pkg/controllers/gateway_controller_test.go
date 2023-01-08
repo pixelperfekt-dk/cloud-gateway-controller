@@ -15,7 +15,7 @@ import (
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const gateway_manifest string = `
+const gatewayManifest string = `
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
@@ -29,7 +29,7 @@ spec:
     protocol: HTTP
     hostname: example.com`
 
-const configmap_manifest string = `
+const configmapManifest string = `
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -42,17 +42,17 @@ func TestGatewayClass(t *testing.T) {
 	r := GatewayReconciler{}
 	gw := &gateway.Gateway{}
 	cm := &corev1.ConfigMap{}
-	_ = yaml.Unmarshal([]byte(gateway_manifest), gw)
-	_ = yaml.Unmarshal([]byte(configmap_manifest), cm)
-	gw_out, err := r.constructGateway(gw, cm)
+	_ = yaml.Unmarshal([]byte(gatewayManifest), gw)
+	_ = yaml.Unmarshal([]byte(configmapManifest), cm)
+	gwOut, err := r.constructGateway(gw, cm)
 	if err != nil {
 		t.Fatalf("Error converting gateway: %+v, %q", gw, err)
 	}
-	if gw_out == nil {
+	if gwOut == nil {
 		t.Fatalf("Error converting gateway: %+v, %q", gw, err)
 	}
-	if gw_out.Spec.GatewayClassName != "istio" {
-		t.Errorf("Unexpected GatewayClassName: %+v", gw_out)
+	if gwOut.Spec.GatewayClassName != "istio" {
+		t.Errorf("Unexpected GatewayClassName: %+v", gwOut)
 	}
 }
 
