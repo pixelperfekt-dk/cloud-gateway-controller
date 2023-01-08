@@ -83,6 +83,9 @@ GOFLAGS ?=
 HTTP_PROXY ?=
 HTTPS_PROXY ?=
 
+# Because we store the module cache locally.
+GOFLAGS := $(GOFLAGS) -modcacherw
+
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -132,8 +135,7 @@ BUILD_DIRS := bin/$(OS)_$(ARCH)                   \
               bin/tools                           \
               .go/bin/$(OS)_$(ARCH)               \
               .go/bin/$(OS)_$(ARCH)/$(OS)_$(ARCH) \
-              .go/cache                           \
-              .go/pkg
+              .go/cache
 
 # Each outbin target is just a facade for the respective stampfile target.
 # This `eval` establishes the dependencies for each.
@@ -174,7 +176,8 @@ go-build: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -198,7 +201,8 @@ shell: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -212,14 +216,46 @@ shell: | $(BUILD_DIRS)
 LICENSES = .licenses
 
 $(LICENSES): | $(BUILD_DIRS)
-	pushd tools >/dev/null;                      \
-	  unset GOOS; unset GOARCH;                  \
-	  export GOBIN=$$(pwd)/../bin/tools;         \
-	  go install github.com/google/go-licenses;  \
-	  popd >/dev/null
+	# Don't assume that `go` is available locally.
+	docker run                                 \
+	    -i                                     \
+	    --rm                                   \
+	    -u $$(id -u):$$(id -g)                 \
+	    -v $$(pwd)/tools:/src                  \
+	    -w /src                                \
+	    -v $$(pwd)/bin/tools:/go/bin           \
+	    -v $$(pwd)/.go/cache:/.cache           \
+	    --env GOCACHE="/.cache/gocache"        \
+	    --env GOMODCACHE="/.cache/gomodcache"  \
+	    --env CGO_ENABLED=0                    \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
+	    $(BUILD_IMAGE)                         \
+	    go install github.com/google/go-licenses
+	# The tool runs in a container because it execs `go`, which doesn't
+	# play nicely with CI.  The tool also wants its output dir to not
+	# exist, so we can't just volume mount $(LICENSES).
+	rm -rf $(LICENSES).tmp
+	mkdir $(LICENSES).tmp
+	docker run                              \
+	    -i                                  \
+	    --rm                                \
+	    -u $$(id -u):$$(id -g)              \
+	    -v $$(pwd)/$(LICENSES).tmp:/output  \
+	    -v $$(pwd):/src                     \
+	    -w /src                             \
+	    -v $$(pwd)/bin/tools:/go/bin        \
+	    -v $$(pwd)/.go/cache:/.cache        \
+	    -v $$(pwd)/.go/pkg:/go/pkg          \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"    \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"  \
+	    $(BUILD_IMAGE)                      \
+	    go-licenses save ./... --save_path=/output/licenses
 	rm -rf $(LICENSES)
-	./bin/tools/go-licenses save ./... --save_path=$(LICENSES)
-	chmod -R a+rx $(LICENSES)
+	mv $(LICENSES).tmp/licenses $(LICENSES)
+	rmdir $(LICENSES).tmp
+	find $(LICENSES) -type d | xargs chmod 0755
+	find $(LICENSES) -type f | xargs chmod 0644
 
 CONTAINER_DOTFILES = $(foreach bin,$(BINS),.container-$(subst /,_,$(REGISTRY)/$(bin))-$(TAG))
 
@@ -281,10 +317,22 @@ push: container
 # This depends on github.com/estesp/manifest-tool.
 manifest-list: # @HELP builds a manifest list of containers for all platforms
 manifest-list: all-push
-	pushd tools >/dev/null;                                             \
-	  export GOBIN=$$(pwd)/../bin/tools;                                \
-	  go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool;  \
-	  popd >/dev/null
+	# Don't assume that `go` is available locally.
+	docker run                                 \
+	    -i                                     \
+	    --rm                                   \
+	    -u $$(id -u):$$(id -g)                 \
+	    -v $$(pwd)/tools:/src                  \
+	    -w /src                                \
+	    -v $$(pwd)/bin/tools:/go/bin           \
+	    -v $$(pwd)/.go/cache:/.cache           \
+	    --env GOCACHE="/.cache/gocache"        \
+	    --env GOMODCACHE="/.cache/gomodcache"  \
+	    --env CGO_ENABLED=0                    \
+	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
+	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
+	    $(BUILD_IMAGE)                         \
+	    go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool
 	for bin in $(BINS); do                                    \
 	    platforms=$$(echo $(ALL_PLATFORMS) | sed 's/ /,/g');  \
 	    bin/tools/manifest-tool                               \
@@ -309,7 +357,8 @@ test: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -331,7 +380,8 @@ lint: | $(BUILD_DIRS)
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin                \
 	    -v $$(pwd)/.go/bin/$(OS)_$(ARCH):/go/bin/$(OS)_$(ARCH)  \
 	    -v $$(pwd)/.go/cache:/.cache                            \
-	    -v $$(pwd)/.go/pkg:/go/pkg                              \
+	    --env GOCACHE="/.cache/gocache"                         \
+	    --env GOMODCACHE="/.cache/gomodcache"                   \
 	    --env ARCH="$(ARCH)"                                    \
 	    --env OS="$(OS)"                                        \
 	    --env VERSION="$(VERSION)"                              \
@@ -341,6 +391,9 @@ lint: | $(BUILD_DIRS)
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"                      \
 	    $(BUILD_IMAGE)                                          \
 	    ./build/lint.sh ./...
+
+fmt:
+	goimports-reviser cmd/ pkg/
 
 $(BUILD_DIRS):
 	mkdir -p $@
