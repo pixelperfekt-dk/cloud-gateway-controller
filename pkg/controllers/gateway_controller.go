@@ -16,7 +16,7 @@ import (
 )
 
 type GatewayReconciler struct {
-	client        client.Client
+	client.Client
 	dynamicClient dynamic.Interface
 	scheme        *runtime.Scheme
 }
@@ -32,15 +32,15 @@ type albTemplateValues struct {
 
 func NewGatewayController(mgr ctrl.Manager) *GatewayReconciler {
 	r := &GatewayReconciler{
-		client:        mgr.GetClient(),
+		Client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
 		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
 
-func (r *GatewayReconciler) Client() client.Client {
-	return r.client
+func (r *GatewayReconciler) GetClient() client.Client {
+	return r.Client
 }
 
 func (r *GatewayReconciler) DynamicClient() dynamic.Interface {
@@ -69,7 +69,7 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log := log.FromContext(ctx)
 
 	gw := &gateway.Gateway{}
-	err := r.client.Get(ctx, req.NamespacedName, gw)
+	err := r.Get(ctx, req.NamespacedName, gw)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -98,17 +98,17 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	gwFound := &gateway.Gateway{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: gwOut.Name, Namespace: gwOut.Namespace}, gwFound)
+	err = r.Get(ctx, types.NamespacedName{Name: gwOut.Name, Namespace: gwOut.Namespace}, gwFound)
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("create gateway")
-		if err := r.client.Create(ctx, gwOut); err != nil {
+		if err := r.Create(ctx, gwOut); err != nil {
 			log.Error(err, "unable to create Gateway", "gateway", gwOut)
 			return ctrl.Result{}, err
 		}
 	} else if err == nil {
 		gwFound.Spec = gwOut.Spec
 		log.Info("update gateway", "gw", gwFound)
-		if err := r.client.Update(ctx, gwFound); err != nil {
+		if err := r.Update(ctx, gwFound); err != nil {
 			log.Error(err, "unable to update Gateway", "gateway", gwFound)
 			return ctrl.Result{}, err
 		}

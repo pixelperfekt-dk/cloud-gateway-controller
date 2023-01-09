@@ -28,7 +28,7 @@ const (
 )
 
 type Controller interface {
-	Client() client.Client
+	GetClient() client.Client
 	DynamicClient() dynamic.Interface
 	Scheme() *runtime.Scheme
 }
@@ -37,7 +37,7 @@ func lookupGatewayClass(ctx context.Context, r Controller, className string) (*g
 	log := log.FromContext(ctx)
 
 	var gwc gateway.GatewayClass
-	err := r.Client().Get(ctx, types.NamespacedName{Name: className, Namespace: ""}, &gwc)
+	err := r.GetClient().Get(ctx, types.NamespacedName{Name: className, Namespace: ""}, &gwc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("GatewayClass %q not found: %w", className, err)
 	}
@@ -53,7 +53,7 @@ func lookupGatewayClass(ctx context.Context, r Controller, className string) (*g
 	if gwc.Spec.ParametersRef != nil {
 		configmap = &corev1.ConfigMap{}
 		// TODO: Check parametersref group+kind is configmap
-		err := r.Client().Get(ctx, types.NamespacedName{Namespace: string(*gwc.Spec.ParametersRef.Namespace),
+		err := r.GetClient().Get(ctx, types.NamespacedName{Namespace: string(*gwc.Spec.ParametersRef.Namespace),
 			Name: gwc.Spec.ParametersRef.Name}, configmap)
 		if err != nil {
 			return &gwc, nil, fmt.Errorf("configmap for GatewayClass not found: %w", err)
@@ -97,7 +97,7 @@ func unstructuredToGVR(r Controller, u *unstructured.Unstructured) (*schema.Grou
 		Group: gv.Group,
 		Kind:  u.GetKind(),
 	}
-	mapping, err := r.Client().RESTMapper().RESTMapping(gk, gv.Version)
+	mapping, err := r.GetClient().RESTMapper().RESTMapping(gk, gv.Version)
 	if err != nil {
 		return nil, err
 	}

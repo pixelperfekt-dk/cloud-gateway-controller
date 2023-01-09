@@ -14,7 +14,7 @@ import (
 )
 
 type GatewayClassReconciler struct {
-	client        client.Client
+	client.Client
 	dynamicClient dynamic.Interface
 	scheme        *runtime.Scheme
 }
@@ -25,15 +25,15 @@ type GatewayClassReconciler struct {
 
 func NewGatewayClassController(mgr ctrl.Manager) *GatewayClassReconciler {
 	r := &GatewayClassReconciler{
-		client:        mgr.GetClient(),
+		Client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
 		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
 
-func (r *GatewayClassReconciler) Client() client.Client {
-	return r.client
+func (r *GatewayClassReconciler) GetClient() client.Client {
+	return r.Client
 }
 
 func (r *GatewayClassReconciler) DynamicClient() dynamic.Interface {
@@ -65,7 +65,7 @@ func (r *GatewayClassReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			Status: "True",
 			Reason: string(gateway.GatewayClassReasonAccepted)})
 	}
-	err = r.client.Status().Update(ctx, gwc)
+	err = r.Status().Update(ctx, gwc)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

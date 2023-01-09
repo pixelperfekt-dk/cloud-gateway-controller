@@ -16,7 +16,7 @@ import (
 )
 
 type HTTPRouteReconciler struct {
-	client        client.Client
+	client.Client
 	dynamicClient dynamic.Interface
 	scheme        *runtime.Scheme
 }
@@ -27,15 +27,15 @@ type HTTPRouteReconciler struct {
 
 func NewHTTPRouteController(mgr ctrl.Manager) *HTTPRouteReconciler {
 	r := &HTTPRouteReconciler{
-		client:        mgr.GetClient(),
+		Client:        mgr.GetClient(),
 		dynamicClient: dynamic.NewForConfigOrDie(ctrl.GetConfigOrDie()),
 		scheme:        mgr.GetScheme(),
 	}
 	return r
 }
 
-func (r *HTTPRouteReconciler) Client() client.Client {
-	return r.client
+func (r *HTTPRouteReconciler) GetClient() client.Client {
+	return r.Client
 }
 
 func (r *HTTPRouteReconciler) DynamicClient() dynamic.Interface {
@@ -61,7 +61,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	log := log.FromContext(ctx)
 
 	rt := &gateway.HTTPRoute{}
-	err := r.client.Get(ctx, req.NamespacedName, rt)
+	err := r.Get(ctx, req.NamespacedName, rt)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -72,7 +72,7 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	pref := prefs[0]
 
 	gw := &gateway.Gateway{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: string(pref.Name), Namespace: string(*pref.Namespace)}, gw)
+	err = r.Get(ctx, types.NamespacedName{Name: string(pref.Name), Namespace: string(*pref.Namespace)}, gw)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -100,17 +100,17 @@ func (r *HTTPRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	rtFound := &gateway.HTTPRoute{}
-	err = r.client.Get(ctx, types.NamespacedName{Name: rtOut.Name, Namespace: rtOut.Namespace}, rtFound)
+	err = r.Get(ctx, types.NamespacedName{Name: rtOut.Name, Namespace: rtOut.Namespace}, rtFound)
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("create gateway")
-		if err := r.client.Create(ctx, rtOut); err != nil {
+		if err := r.Create(ctx, rtOut); err != nil {
 			log.Error(err, "unable to create Gateway", "httproute", rtOut)
 			return ctrl.Result{}, err
 		}
 	} else if err == nil {
 		rtFound.Spec = rtOut.Spec
 		log.Info("update httproute", "rt", rtFound)
-		if err := r.client.Update(ctx, rtFound); err != nil {
+		if err := r.Update(ctx, rtFound); err != nil {
 			log.Error(err, "unable to update HTTPRoute", "httproute", rtFound)
 			return ctrl.Result{}, err
 		}
